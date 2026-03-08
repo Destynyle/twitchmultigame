@@ -1,0 +1,2 @@
+ALTER TABLE "users" ADD COLUMN "deleted_at" timestamp with time zone;--> statement-breakpoint
+ALTER POLICY "tenants_self_isolation" ON "tenants" TO public USING ("tenants"."id" = current_setting('app.current_tenant_id', true)::uuid AND "tenants"."deleted_at" IS NULL);

@@ -25,7 +25,11 @@ interface ConnectedEvent {
   tenantId: string
 }
 
-type OverlayEvent = ScoringEvent | StateEvent | ConnectedEvent
+interface ForceReconnectEvent {
+  type: 'force_reconnect'
+}
+
+type OverlayEvent = ScoringEvent | StateEvent | ConnectedEvent | ForceReconnectEvent
 
 const REASON_LABEL: Record<ScoringEvent['reason'], string> = {
   correct_title: 'found the title',
@@ -68,6 +72,12 @@ export default function OverlayClient({
       es.onmessage = (e) => {
         try {
           const event = JSON.parse(e.data as string) as OverlayEvent
+
+          if (event.type === 'force_reconnect') {
+            es.close()
+            setTimeout(connect, 100)
+            return
+          }
 
           if (event.type === 'scoring') {
             setLastScore(event)

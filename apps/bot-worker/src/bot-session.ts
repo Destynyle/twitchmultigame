@@ -215,6 +215,9 @@ export class BotSession {
         case 'end':
           await this.handleEnd()
           break
+        case 'reconnect':
+          await this.handleBotReconnect()
+          break
         default:
           logger.warn({ action }, 'Unknown session command')
       }
@@ -361,6 +364,19 @@ export class BotSession {
       displayName: s.viewerDisplayName,
       score: s.score,
     }))
+  }
+
+  private async handleBotReconnect(): Promise<void> {
+    logger.info({ sessionId: this.sessionId }, 'Admin-triggered bot reconnect')
+    await this.setBotStatus('reconnecting')
+    try {
+      await this.connection.disconnect()
+      await this.connection.connect()
+      await this.setBotStatus('connected')
+      logger.info({ sessionId: this.sessionId }, 'Admin bot reconnect successful')
+    } catch (e) {
+      logger.error({ err: e, sessionId: this.sessionId }, 'Admin bot reconnect failed')
+    }
   }
 
   private async setBotStatus(status: 'connected' | 'reconnecting'): Promise<void> {

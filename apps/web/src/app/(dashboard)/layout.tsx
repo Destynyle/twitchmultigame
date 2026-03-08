@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '~/server/auth'
 import { Sidebar } from './components/sidebar'
 import { QueryProvider } from './components/QueryProvider'
+import { AdminNotificationBanner } from './components/AdminNotificationBanner'
 
 export default async function DashboardLayout({
   children,
@@ -22,6 +23,7 @@ export default async function DashboardLayout({
         <main className="flex-1 overflow-y-auto p-8">
           {children}
         </main>
+        <AdminNotificationBanner />
       </div>
     </QueryProvider>
   )

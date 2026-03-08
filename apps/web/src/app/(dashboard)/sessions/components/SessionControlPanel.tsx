@@ -1,6 +1,8 @@
 'use client'
 import { useState, useTransition, useEffect, useCallback } from 'react'
 import { updateSessionStatusAction, nextTrackAction, getSessionScoresAction } from '../actions'
+import SpotifyPlaybackWidget from './SpotifyPlaybackWidget'
+import YouTubePlayerWidget from './YouTubePlayerWidget'
 
 type SessionStatus = 'pending' | 'active' | 'paused' | 'ended' | 'test_ended'
 
@@ -18,6 +20,7 @@ type Session = {
 type Playlist = {
   id: string
   name: string
+  sourceType: string
 }
 
 type ScoreRow = {
@@ -206,6 +209,22 @@ export default function SessionControlPanel({ session, playlists, onSessionUpdat
         <p className="text-gray-500 text-xs">
           Hotkeys: <kbd>Space</kbd> pause/resume &nbsp; <kbd>→</kbd> or <kbd>N</kbd> next track &nbsp; <kbd>Esc</kbd> end
         </p>
+      )}
+
+      {isActiveOrPaused && (
+        <SpotifyPlaybackWidget
+          sessionId={session.id}
+          currentTrackIndex={session.currentTrackIndex}
+          playlistSourceType={playlist?.sourceType ?? 'manual'}
+        />
+      )}
+
+      {isActiveOrPaused && (
+        <YouTubePlayerWidget
+          sessionId={session.id}
+          currentTrackIndex={session.currentTrackIndex}
+          playlistSourceType={playlist?.sourceType ?? 'manual'}
+        />
       )}
 
       {/* Leaderboard section */}

@@ -2,9 +2,10 @@
 import { auth } from '~/server/auth'
 import { redirect } from 'next/navigation'
 import { withTenantContext } from '@playground/db'
-import { sessions, sessionScores } from '@playground/db/schema'
-import { eq, and, desc } from 'drizzle-orm'
+import { sessions, sessionScores, tracks, playlists } from '@playground/db/schema'
+import { eq, and, desc, asc } from 'drizzle-orm'
 import { getRedisPublisher, SESSION_CMD_CHANNEL, SESSIONS_EVENTS_CHANNEL } from '~/server/redis'
+import { getSpotifyToken } from '~/server/spotify'
 
 export async function createSessionAction(formData: FormData) {
   const session = await auth()
@@ -128,5 +129,55 @@ export async function getSessionScoresAction(sessionId: string) {
       .from(sessionScores)
       .where(eq(sessionScores.sessionId, sessionId))
       .orderBy(desc(sessionScores.score))
+  })
+}
+
+export async function getSpotifyAccessTokenAction(): Promise<{ token: string } | { error: string }> {
+  const session = await auth()
+  if (!session?.user?.tenantId) return { error: 'Unauthorized' }
+  const tenantId = session.user.tenantId
+
+  const token = await getSpotifyToken(tenantId)
+  if (!token) return { error: 'Spotify not connected' }
+  return { token }
+}
+
+export async function getCurrentTrackAction(sessionId: string): Promise<{
+  title: string
+  artist: string | null
+  sourceType: string | null
+  sourceId: string | null
+  position: number
+} | { error: string }> {
+  const session = await auth()
+  if (!session?.user?.tenantId) return { error: 'Unauthorized' }
+  const tenantId = session.user.tenantId
+
+  return withTenantContext(tenantId, async (tx) => {
+    // Get current track index for the session
+    const [sessionRow] = await tx
+      .select({ currentTrackIndex: sessions.currentTrackIndex, playlistId: sessions.playlistId })
+      .from(sessions)
+      .where(eq(sessions.id, sessionId))
+
+    if (!sessionRow?.playlistId) return { error: 'Session not found or no playlist' }
+
+    // Get tracks ordered by position
+    const trackList = await tx
+      .select()
+      .from(tracks)
+      .where(eq(tracks.playlistId, sessionRow.playlistId))
+      .orderBy(asc(tracks.position))
+
+    const track = trackList[sessionRow.currentTrackIndex]
+    if (!track) return { error: 'Track not found at current index' }
+
+    return {
+      title: track.title,
+      artist: track.artist ?? null,
+      sourceType: track.sourceType ?? null,
+      sourceId: track.sourceId ?? null,
+      position: track.position,
+    }
   })
 }

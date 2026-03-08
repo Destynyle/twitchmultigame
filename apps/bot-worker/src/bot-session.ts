@@ -90,6 +90,12 @@ export class BotSession {
       await this.handleChatMessage(username, displayName, text)
     })
 
+    // 4b. Register reconnect handler (FR26/FR27)
+    this.connection.onReconnect?.(() => {
+      logger.info({ sessionId: this.sessionId }, 'Chat reconnected — session continues')
+      void this.publishSystemEvent('reconnected')
+    })
+
     // 5. Subscribe to session command channel
     await this.subscriber.subscribe(`session:cmd:${this.sessionId}`)
     this.subscriber.on('message', (_channel: string, message: string) => {
@@ -341,6 +347,17 @@ export class BotSession {
       displayName: s.viewerDisplayName,
       score: s.score,
     }))
+  }
+
+  private async publishSystemEvent(event: 'reconnected'): Promise<void> {
+    if (!this.publisher) return
+    const payload = JSON.stringify({
+      type: 'system',
+      event,
+      sessionId: this.sessionId,
+      timestamp: new Date().toISOString(),
+    })
+    await this.publisher.publish(`overlay:${this.tenantId}`, payload)
   }
 
   private async publishScoringEvent(event: ScoringEvent): Promise<void> {

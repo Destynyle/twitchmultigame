@@ -255,4 +255,43 @@ describe('BotSession', () => {
     })
     expect(endedEvents.length).toBeGreaterThan(0)
   })
+
+  it('publishes system/reconnected event and processes queued messages after reconnect', async () => {
+    // start(): session + tracks; upsertScore insert path: []; getLeaderboard: []
+    setupTx([mockSessionRow], mockTracks, [], [])
+
+    const { session, connection } = createBotSession()
+    await session.start()
+
+    sharedState.publishedMessages.length = 0
+
+    // Simulate drop — messages arriving during reconnect window must be queued
+    connection.simulateDisconnect()
+    connection.simulateMessage('testchannel', 'viewer1', 'Viewer1', 'Queen')
+
+    // Nothing processed yet
+    expect(sharedState.publishedMessages.filter((m) => {
+      const p = JSON.parse(m.message) as { type: string }
+      return p.type === 'scoring'
+    }).length).toBe(0)
+
+    // Reconnect — queued message flushed, scoring fires, system event fires
+    connection.simulateReconnect()
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    const systemEvents = sharedState.publishedMessages.filter((m) => {
+      const p = JSON.parse(m.message) as { type: string; event?: string }
+      return p.type === 'system' && p.event === 'reconnected'
+    })
+    expect(systemEvents.length).toBeGreaterThan(0)
+
+    const scoringEvents = sharedState.publishedMessages.filter((m) => {
+      const p = JSON.parse(m.message) as { type: string }
+      return p.type === 'scoring'
+    })
+    expect(scoringEvents.length).toBeGreaterThan(0)
+
+    await session.stop()
+  })
 })

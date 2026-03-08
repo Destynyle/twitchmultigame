@@ -64,6 +64,13 @@
       "when": 1741478400000,
       "tag": "0008_overlay_themes",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1741564800000,
+      "tag": "0009_admin_audit_log",
+      "breakpoints": true
     }
   ]
 }

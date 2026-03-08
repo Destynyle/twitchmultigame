@@ -6,7 +6,7 @@ declare module 'next-auth' {
     user: {
       tenantId: string
       twitchLogin: string
-      role: 'free' | 'premium' | 'admin'
+      role: 'free' | 'premium' | 'admin' | 'quarantined'
       subscriptionStatus: 'free' | 'active' | 'past_due' | 'canceled'
     } & DefaultSession['user']
   }

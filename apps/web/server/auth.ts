@@ -141,7 +141,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (!token.tenantId) return session
       session.user.tenantId = token.tenantId as string
       session.user.twitchLogin = token.twitchLogin as string
-      session.user.role = (token.role as 'free' | 'premium' | 'admin') ?? 'free'
+      session.user.role = (token.role as 'free' | 'premium' | 'admin' | 'quarantined') ?? 'free'
       session.user.subscriptionStatus =
         (token.subscriptionStatus as
           | 'free'

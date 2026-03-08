@@ -13,13 +13,18 @@ const NAV_LINKS = [
   { href: '/dashboard/settings', label: 'Settings' },
 ] as const
 
+const ADMIN_NAV_LINKS = [
+  { href: '/dashboard/admin/audit-log', label: 'Audit Log' },
+] as const
+
 interface SidebarProps {
   session: Session
 }
 
 export function Sidebar({ session }: SidebarProps) {
-  const { name, image } = session.user
+  const { name, image, role } = session.user
   const pathname = usePathname()
+  const isAdmin = role === 'admin'
 
   return (
     <nav
@@ -53,6 +58,31 @@ export function Sidebar({ session }: SidebarProps) {
             </li>
           )
         })}
+
+        {isAdmin && (
+          <>
+            <li className="mt-4 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-gray-600">
+              Admin
+            </li>
+            {ADMIN_NAV_LINKS.map(({ href, label }) => {
+              const isActive = pathname === href || pathname.startsWith(`${href}/`)
+              return (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`block rounded-lg px-3 py-2 transition focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-1 focus:ring-offset-gray-900 ${isActive
+                      ? 'bg-gray-800 text-white font-medium'
+                      : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                      }`}
+                  >
+                    {label}
+                  </Link>
+                </li>
+              )
+            })}
+          </>
+        )}
       </ul>
 
       {/* User info + sign out */}

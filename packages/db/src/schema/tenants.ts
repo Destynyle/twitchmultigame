@@ -12,7 +12,7 @@ import { sql } from 'drizzle-orm'
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
-export const userRoleEnum = pgEnum('user_role', ['free', 'premium', 'admin'])
+export const userRoleEnum = pgEnum('user_role', ['free', 'premium', 'admin', 'quarantined'])
 
 export const subscriptionStatusEnum = pgEnum('subscription_status', [
   'free',

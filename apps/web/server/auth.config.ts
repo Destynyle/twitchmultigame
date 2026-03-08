@@ -16,12 +16,18 @@ export const authConfig = {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user
       const isDashboard = nextUrl.pathname.startsWith('/dashboard')
+      const isAdminRoute = nextUrl.pathname.startsWith('/dashboard/admin')
+
       if (isDashboard && !isLoggedIn) {
-        // AC7: Preserve original path as callbackUrl parameter
         const signInUrl = new URL('/auth/signin', nextUrl.origin)
         signInUrl.searchParams.set('callbackUrl', nextUrl.pathname)
         return NextResponse.redirect(signInUrl)
       }
+
+      if (isAdminRoute && auth?.user?.role !== 'admin') {
+        return NextResponse.redirect(new URL('/dashboard', nextUrl.origin))
+      }
+
       return true
     },
   },

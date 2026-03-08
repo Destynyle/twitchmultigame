@@ -46,7 +46,18 @@ export default function OverlayClient({
   const [gameStatus, setGameStatus] = useState<StateEvent['status']>('idle')
   const [trackInfo, setTrackInfo] = useState<{ title?: string; artist?: string }>({})
   const [showScore, setShowScore] = useState(false)
+  const [cssVars, setCssVars] = useState<Record<string, string>>({})
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Fetch theme CSS variables
+  useEffect(() => {
+    void fetch(`/api/overlay/${token}/theme`)
+      .then((r) => r.json())
+      .then((data: { cssVariables?: Record<string, string> }) => {
+        if (data.cssVariables) setCssVars(data.cssVariables)
+      })
+      .catch(() => {})
+  }, [token])
 
   useEffect(() => {
     let es: EventSource
@@ -97,10 +108,11 @@ export default function OverlayClient({
       style={{
         fontFamily: 'sans-serif',
         background: 'transparent',
-        color: '#fff',
+        color: cssVars['--overlay-text'] ?? '#fff',
         padding: '16px',
         minHeight: '100vh',
         position: 'relative',
+        ...cssVars,
       }}
     >
       {/* Scoring event banner */}
@@ -201,6 +213,31 @@ export default function OverlayClient({
           to   { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
       `}</style>
+
+      {/* Viewer-to-streamer CTA (FR39) */}
+      {(gameStatus === 'active' || gameStatus === 'idle') && (
+        <a
+          href="https://playground.gg?utm_source=overlay&utm_campaign=viewer_cta&utm_medium=overlay"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            position: 'fixed',
+            bottom: '16px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(124, 58, 237, 0.75)',
+            borderRadius: '20px',
+            padding: '5px 14px',
+            fontSize: '11px',
+            color: '#fff',
+            textDecoration: 'none',
+            whiteSpace: 'nowrap',
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          🎮 Stream your own games → playground.gg
+        </a>
+      )}
 
       {/* Hidden token for debugging */}
       <span style={{ display: 'none' }} data-overlay-token={token} />

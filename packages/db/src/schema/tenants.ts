@@ -37,6 +37,7 @@ export const tenants = pgTable(
     twitchLogin: text('twitch_login').notNull(),
     displayName: text('display_name').notNull(),
     overlayToken: text('overlay_token'),
+    selectedThemeId: uuid('selected_theme_id'),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()

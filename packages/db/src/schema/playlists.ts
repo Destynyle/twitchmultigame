@@ -25,6 +25,7 @@ export const playlists = pgTable(
     // external playlist ID if imported
     sourceId: text('source_id'),
     trackCount: integer('track_count').notNull().default(0),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

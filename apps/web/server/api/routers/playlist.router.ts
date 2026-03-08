@@ -132,6 +132,83 @@ export const playlistRouter = createTRPCRouter({
     }),
 
   /**
+   * Updates a playlist: optionally renames it and/or replaces its track list.
+   * If tracks are provided, all existing tracks are deleted and re-inserted.
+   */
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        name: z.string().min(1, 'Playlist name is required').optional(),
+        tracks: z.array(trackInputSchema).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = ctx.session.user.tenantId
+
+      return withTenantContext(tenantId, async (tx) => {
+        // Verify playlist exists
+        const [existing] = await tx
+          .select()
+          .from(playlists)
+          .where(eq(playlists.id, input.id))
+          .limit(1)
+
+        if (!existing) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Playlist not found' })
+        }
+
+        // Build update values
+        const updateValues: Partial<typeof playlists.$inferInsert> = {
+          updatedAt: new Date(),
+        }
+        if (input.name !== undefined) {
+          updateValues.name = input.name.trim()
+        }
+        if (input.tracks !== undefined) {
+          updateValues.trackCount = input.tracks.length
+        }
+
+        const [updated] = await tx
+          .update(playlists)
+          .set(updateValues)
+          .where(eq(playlists.id, input.id))
+          .returning()
+
+        if (!updated) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to update playlist',
+          })
+        }
+
+        // Replace tracks if provided
+        if (input.tracks !== undefined) {
+          await tx.delete(tracks).where(eq(tracks.playlistId, input.id))
+
+          let insertedTracks: (typeof tracks.$inferSelect)[] = []
+          if (input.tracks.length > 0) {
+            const trackValues = input.tracks.map((trackInput, index) => ({
+              playlistId: input.id,
+              tenantId,
+              title: trackInput.title,
+              artist: trackInput.artist ?? null,
+              durationSeconds: trackInput.durationSeconds ?? null,
+              sourceType: trackInput.sourceType ?? 'manual',
+              sourceId: trackInput.sourceId ?? null,
+              position: trackInput.position ?? index,
+            }))
+            insertedTracks = await tx.insert(tracks).values(trackValues).returning()
+          }
+
+          return { ...updated, tracks: insertedTracks }
+        }
+
+        return updated
+      })
+    }),
+
+  /**
    * Deletes a playlist (and its tracks via cascade).
    */
   delete: protectedProcedure

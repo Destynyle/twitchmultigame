@@ -310,3 +310,239 @@ describe('Story 2.4 — Playlist & Track Schema + Manual Playlist Creation', () 
     expect(combinedSql).toContain('ALTER TABLE "tracks" FORCE ROW LEVEL SECURITY')
   })
 })
+
+describe('Story 3.2 — Session Lifecycle', () => {
+  it('session.router.ts has all lifecycle procedures', () => {
+    const src = path.resolve(__dirname, '../server/api/routers/session.router.ts')
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('list:')
+    expect(content).toContain('create:')
+    expect(content).toContain('launch:')
+    expect(content).toContain('pause:')
+    expect(content).toContain('resume:')
+    expect(content).toContain('end:')
+    expect(content).toContain('nextTrack:')
+  })
+  it('root.ts registers sessionRouter', () => {
+    const src = path.resolve(__dirname, '../server/api/root.ts')
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('sessionRouter')
+    expect(content).toContain('session:')
+  })
+  it('sessions actions.ts exports createSessionAction and updateSessionStatusAction', () => {
+    const src = path.resolve(__dirname, './app/(dashboard)/sessions/actions.ts')
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain("'use server'")
+    expect(content).toContain('createSessionAction')
+    expect(content).toContain('updateSessionStatusAction')
+  })
+  it('SessionControlPanel shows lifecycle buttons', () => {
+    const src = path.resolve(__dirname, './app/(dashboard)/sessions/components/SessionControlPanel.tsx')
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain("'use client'")
+    expect(content).toContain('Launch')
+    expect(content).toContain('Pause')
+    expect(content).toContain('End')
+  })
+})
+
+describe('Story 3.1 — GamePlugin Contract & Session Schema', () => {
+  it('game-types plugin.interface.ts defines GamePlugin with required hooks', () => {
+    const src = path.resolve(__dirname, '../../../packages/game-types/src/plugin.interface.ts')
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('GamePlugin')
+    expect(content).toContain('onSessionStart')
+    expect(content).toContain('onChatMessage')
+    expect(content).toContain('onStreamerAction')
+    expect(content).toContain('onReveal')
+    expect(content).toContain('onSessionEnd')
+    expect(content).toContain('version')
+  })
+  it('IChatConnection.ts defines the interface', () => {
+    const src = path.resolve(__dirname, '../../../apps/bot-worker/src/connections/IChatConnection.ts')
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('IChatConnection')
+    expect(content).toContain('connect')
+    expect(content).toContain('onMessage')
+  })
+  it('sessions schema file has sessions, session_scores, game_configs', () => {
+    const src = path.resolve(__dirname, '../../../packages/db/src/schema/sessions.ts')
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('export const sessions')
+    expect(content).toContain('export const sessionScores')
+    expect(content).toContain('export const gameConfigs')
+  })
+  it('migration SQL contains sessions tables', () => {
+    const migrationsDir = path.resolve(__dirname, '../../../packages/db/migrations')
+    const sqlFiles = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql'))
+    const combined = sqlFiles.map(f => fs.readFileSync(path.join(migrationsDir, f), 'utf-8')).join('\n')
+    expect(combined).toContain('CREATE TABLE "sessions"')
+    expect(combined).toContain('CREATE TABLE "session_scores"')
+    expect(combined).toContain('CREATE TABLE "game_configs"')
+  })
+})
+
+describe('Story 2.6 — Playlist Management: Edit, Rename, Delete & Export', () => {
+  it('playlist.router.ts has update procedure', () => {
+    const src = path.resolve(
+      __dirname,
+      '../server/api/routers/playlist.router.ts'
+    )
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('update:')
+    expect(content).toContain('protectedProcedure')
+  })
+
+  it('playlist.router.ts update procedure accepts id, name, and tracks', () => {
+    const src = path.resolve(
+      __dirname,
+      '../server/api/routers/playlist.router.ts'
+    )
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('z.string().uuid()')
+    expect(content).toContain('.optional()')
+    expect(content).toContain('.mutation(')
+  })
+
+  it('playlist.router.ts update replaces tracks by deleting and re-inserting', () => {
+    const src = path.resolve(
+      __dirname,
+      '../server/api/routers/playlist.router.ts'
+    )
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('tx.delete(tracks)')
+    expect(content).toContain('tx.insert(tracks)')
+  })
+
+  it('actions.ts has deletePlaylistAction server action', () => {
+    const src = path.resolve(
+      __dirname,
+      './app/(dashboard)/playlists/actions.ts'
+    )
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain("'use server'")
+    expect(content).toContain('deletePlaylistAction')
+  })
+
+  it('actions.ts has updatePlaylistAction server action', () => {
+    const src = path.resolve(
+      __dirname,
+      './app/(dashboard)/playlists/actions.ts'
+    )
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('updatePlaylistAction')
+  })
+
+  it('actions.ts deletePlaylistAction uses withTenantContext and auth check', () => {
+    const src = path.resolve(
+      __dirname,
+      './app/(dashboard)/playlists/actions.ts'
+    )
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('deletePlaylistAction')
+    expect(content).toContain('withTenantContext')
+    expect(content).toContain('auth()')
+  })
+
+  it('export route exists at the correct path', () => {
+    const src = path.resolve(
+      __dirname,
+      './app/api/playlists/[id]/export/route.ts'
+    )
+    expect(fs.existsSync(src)).toBe(true)
+  })
+
+  it('export route exports GET handler', () => {
+    const src = path.resolve(
+      __dirname,
+      './app/api/playlists/[id]/export/route.ts'
+    )
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('export async function GET')
+  })
+
+  it('export route checks auth and uses withTenantContext', () => {
+    const src = path.resolve(
+      __dirname,
+      './app/api/playlists/[id]/export/route.ts'
+    )
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('auth()')
+    expect(content).toContain('withTenantContext')
+  })
+
+  it('export route sets Content-Disposition attachment header', () => {
+    const src = path.resolve(
+      __dirname,
+      './app/api/playlists/[id]/export/route.ts'
+    )
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('Content-Disposition')
+    expect(content).toContain('attachment')
+  })
+
+  it('export route returns tracks with title, artist, and metadata', () => {
+    const src = path.resolve(
+      __dirname,
+      './app/api/playlists/[id]/export/route.ts'
+    )
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('title')
+    expect(content).toContain('artist')
+    expect(content).toContain('durationSeconds')
+    expect(content).toContain('sourceType')
+  })
+
+  it('EditPlaylistForm.tsx is a client component', () => {
+    const src = path.resolve(
+      __dirname,
+      './app/(dashboard)/playlists/components/EditPlaylistForm.tsx'
+    )
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain("'use client'")
+  })
+
+  it('EditPlaylistForm.tsx calls updatePlaylistAction', () => {
+    const src = path.resolve(
+      __dirname,
+      './app/(dashboard)/playlists/components/EditPlaylistForm.tsx'
+    )
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('updatePlaylistAction')
+  })
+
+  it('EditPlaylistForm.tsx supports add, remove, and reorder tracks', () => {
+    const src = path.resolve(
+      __dirname,
+      './app/(dashboard)/playlists/components/EditPlaylistForm.tsx'
+    )
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('addTrack')
+    expect(content).toContain('removeTrack')
+    expect(content).toContain('moveTrackUp')
+    expect(content).toContain('moveTrackDown')
+  })
+
+  it('PlaylistsClient.tsx has delete, rename, edit, and export actions', () => {
+    const src = path.resolve(
+      __dirname,
+      './app/(dashboard)/playlists/components/PlaylistsClient.tsx'
+    )
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('deletePlaylistAction')
+    expect(content).toContain('updatePlaylistAction')
+    expect(content).toContain('EditPlaylistForm')
+    expect(content).toContain('/api/playlists/')
+    expect(content).toContain('export')
+  })
+
+  it('PlaylistsClient.tsx has delete confirmation before deleting', () => {
+    const src = path.resolve(
+      __dirname,
+      './app/(dashboard)/playlists/components/PlaylistsClient.tsx'
+    )
+    const content = fs.readFileSync(src, 'utf-8')
+    expect(content).toContain('deletingId')
+    expect(content).toContain('confirmDelete')
+  })
+})

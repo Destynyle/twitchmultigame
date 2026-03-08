@@ -12,6 +12,8 @@ export type AdminActionType =
   | 'content.dismiss_report'
   | 'playlist.publish'
   | 'playlist.edit'
+  | 'playlist.official_publish'
+  | 'playlist.official_edit'
 
 /**
  * Inserts an immutable audit log entry for an admin action.

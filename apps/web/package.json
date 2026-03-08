@@ -14,6 +14,7 @@
   "dependencies": {
     "@playground/db": "workspace:*",
     "@playground/shared": "workspace:*",
+    "@tanstack/react-query": "^5.90.21",
     "@trpc/server": "^11.0.0",
     "drizzle-orm": "^0.38.3",
     "ioredis": "^5.4.2",

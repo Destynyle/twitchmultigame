@@ -26,6 +26,7 @@ export class TwitchChatConnection implements IChatConnection {
   private messageQueue: QueuedMessage[] = []
   private messageHandler?: (channel: string, username: string, displayName: string, text: string) => void
   private reconnectHandler?: () => void
+  private disconnectHandler?: () => void
 
   constructor(private readonly twitchLogin: string, accessToken: string) {
     this.client = new tmi.Client({
@@ -80,6 +81,7 @@ export class TwitchChatConnection implements IChatConnection {
       if (!this.intentionalDisconnect) {
         this.reconnecting = true
         logger.warn({ channel: twitchLogin, reason }, 'TwitchChatConnection disconnected — reconnecting')
+        this.disconnectHandler?.()
       } else {
         logger.info({ channel: twitchLogin }, 'TwitchChatConnection intentionally disconnected')
       }
@@ -110,6 +112,10 @@ export class TwitchChatConnection implements IChatConnection {
 
   onReconnect(handler: () => void): void {
     this.reconnectHandler = handler
+  }
+
+  onDisconnect(handler: () => void): void {
+    this.disconnectHandler = handler
   }
 
   isConnected(): boolean {

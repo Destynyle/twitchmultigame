@@ -6,6 +6,7 @@ export class MockChatConnection implements IChatConnection {
   private messageQueue: Array<[string, string, string, string]> = []
   private messageHandler?: (channel: string, username: string, displayName: string, text: string) => void
   private reconnectHandler?: () => void
+  private disconnectHandler?: () => void
   public sentMessages: string[] = []
 
   async connect(): Promise<void> { this.connected = true }
@@ -18,6 +19,10 @@ export class MockChatConnection implements IChatConnection {
   }
   onReconnect(handler: () => void): void {
     this.reconnectHandler = handler
+  }
+
+  onDisconnect(handler: () => void): void {
+    this.disconnectHandler = handler
   }
   isConnected(): boolean { return this.connected }
 
@@ -34,6 +39,7 @@ export class MockChatConnection implements IChatConnection {
   simulateDisconnect(): void {
     this.connected = false
     this.reconnecting = true
+    this.disconnectHandler?.()
   }
 
   /** Test helper: simulate successful reconnection (flushes message queue) */

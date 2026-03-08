@@ -14,6 +14,7 @@ const NAV_LINKS = [
 ] as const
 
 const ADMIN_NAV_LINKS = [
+  { href: '/dashboard/admin', label: 'Monitoring' },
   { href: '/dashboard/admin/audit-log', label: 'Audit Log' },
 ] as const
 

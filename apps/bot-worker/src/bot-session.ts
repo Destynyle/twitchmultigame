@@ -90,9 +90,15 @@ export class BotSession {
       await this.handleChatMessage(username, displayName, text)
     })
 
-    // 4b. Register reconnect handler (FR26/FR27)
+    // 4b. Register disconnect/reconnect handlers for bot status tracking
+    this.connection.onDisconnect?.(() => {
+      logger.info({ sessionId: this.sessionId }, 'Chat disconnected — marking reconnecting')
+      void this.setBotStatus('reconnecting')
+    })
+
     this.connection.onReconnect?.(() => {
       logger.info({ sessionId: this.sessionId }, 'Chat reconnected — session continues')
+      void this.setBotStatus('connected')
       void this.publishSystemEvent('reconnected')
     })
 
@@ -114,6 +120,9 @@ export class BotSession {
     // 7. Publish initial overlay state
     await this.publishState('active', [])
 
+    // 8. Mark bot as connected in Redis for admin monitoring
+    await this.setBotStatus('connected')
+
     logger.info({ sessionId: this.sessionId }, 'BotSession started')
   }
 
@@ -122,6 +131,11 @@ export class BotSession {
     this.stopped = true
 
     logger.info({ sessionId: this.sessionId }, 'BotSession stopping')
+
+    // Remove bot status key (session is intentionally ending)
+    if (this.publisher) {
+      await this.publisher.del(`bot:status:${this.sessionId}`).catch(() => {})
+    }
 
     try {
       await this.connection.disconnect()
@@ -347,6 +361,13 @@ export class BotSession {
       displayName: s.viewerDisplayName,
       score: s.score,
     }))
+  }
+
+  private async setBotStatus(status: 'connected' | 'reconnecting'): Promise<void> {
+    if (!this.publisher) return
+    const value = JSON.stringify({ status, since: new Date().toISOString() })
+    // TTL 300s — auto-cleaned if bot crashes without explicit stop
+    await this.publisher.setex(`bot:status:${this.sessionId}`, 300, value)
   }
 
   private async publishSystemEvent(event: 'reconnected'): Promise<void> {

@@ -26,7 +26,7 @@ export default async function ModerationPage({
       {/* Reason filter */}
       <div className="mb-4 flex gap-2">
         <a
-          href="/dashboard/admin/moderation"
+          href="/admin/moderation"
           className={`rounded-full px-3 py-1 text-sm ${!filterReason ? 'bg-purple-700 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
         >
           All
@@ -34,7 +34,7 @@ export default async function ModerationPage({
         {REPORT_REASONS.map((r) => (
           <a
             key={r}
-            href={`/dashboard/admin/moderation?reason=${r}`}
+            href={`/admin/moderation?reason=${r}`}
             className={`rounded-full px-3 py-1 text-sm capitalize ${filterReason === r ? 'bg-purple-700 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
           >
             {r}

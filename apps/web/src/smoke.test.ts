@@ -28,8 +28,8 @@ describe('dependency presence', () => {
 describe('auth.config exports', () => {
   it('authConfig has pages, providers, callbacks', async () => {
     const { authConfig } = await import('../server/auth.config')
-    expect(authConfig.pages?.signIn).toBe('/auth/signin')
-    expect(authConfig.pages?.error).toBe('/auth/error')
+    expect(authConfig.pages?.signIn).toBe('/signin')
+    expect(authConfig.pages?.error).toBe('/error')
     expect(authConfig.providers).toBeDefined()
     expect(typeof authConfig.callbacks?.authorized).toBe('function')
   })

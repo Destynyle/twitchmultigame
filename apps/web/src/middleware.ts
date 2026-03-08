@@ -4,7 +4,7 @@ import { authConfig } from '~/server/auth.config'
 /**
  * Uses the edge-compatible auth config (no DB imports).
  * The `authorized` callback in authConfig handles dashboard protection.
- * Unauthenticated requests to /dashboard/* are redirected to /auth/signin.
+ * Unauthenticated requests to /dashboard/* are redirected to /signin.
  */
 const { auth } = NextAuth(authConfig)
 

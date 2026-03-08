@@ -11,7 +11,7 @@ export async function GET(
 ) {
   const session = await auth()
   if (!session?.user?.tenantId) {
-    redirect('/auth/signin')
+    redirect('/signin')
   }
 
   const tenantId = session.user.tenantId

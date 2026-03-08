@@ -13,7 +13,7 @@ export default async function DashboardLayout({
 
   // Middleware handles most cases; this is a server-side safety net
   if (!session) {
-    redirect('/auth/signin')
+    redirect('/signin')
   }
 
   return (

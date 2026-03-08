@@ -10,7 +10,7 @@ export default async function SettingsPage({
   searchParams: Promise<{ spotify?: string }>
 }) {
   const session = await auth()
-  if (!session?.user?.tenantId) redirect('/auth/signin')
+  if (!session?.user?.tenantId) redirect('/signin')
 
   const params = await searchParams
   const spotifyConnected = await isSpotifyConnected(session.user.tenantId)

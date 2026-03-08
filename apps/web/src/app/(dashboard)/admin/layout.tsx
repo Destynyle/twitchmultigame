@@ -10,7 +10,7 @@ export default async function AdminLayout({
 
   // Middleware handles the redirect, this is a server-side safety net
   if (!session || session.user.role !== 'admin') {
-    redirect('/dashboard')
+    redirect('/sessions')
   }
 
   return <>{children}</>

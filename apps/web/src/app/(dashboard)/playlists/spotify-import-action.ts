@@ -18,7 +18,7 @@ export async function importSpotifyPlaylistAction(
   spotifyPlaylistName: string
 ): Promise<SpotifyImportResult> {
   const session = await auth()
-  if (!session?.user?.tenantId) redirect('/auth/signin')
+  if (!session?.user?.tenantId) redirect('/signin')
 
   const tenantId = session.user.tenantId
   const role = session.user.role

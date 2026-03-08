@@ -152,7 +152,7 @@ export default function AdminMonitoringPage() {
                     <td className="px-4 py-3">
                       {isDisconnected && (
                         <a
-                          href={`/dashboard/admin/sessions/${s.id}/intervene`}
+                          href={`/admin/sessions/${s.id}/intervene`}
                           className="rounded px-2 py-1 text-xs font-medium text-red-400 ring-1 ring-red-800 hover:bg-red-900/30"
                         >
                           Intervene

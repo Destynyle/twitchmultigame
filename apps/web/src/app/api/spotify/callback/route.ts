@@ -11,13 +11,13 @@ export async function GET(req: NextRequest) {
   const tenantId = searchParams.get('state')
   const error = searchParams.get('error')
 
+  const baseUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000'
+
   if (error || !code || !tenantId) {
     return NextResponse.redirect(
-      new URL('/dashboard/settings?spotify=error', req.url)
+      new URL('/settings?spotify=error', baseUrl)
     )
   }
-
-  const baseUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000'
 
   const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 
   if (!tokenRes.ok) {
     return NextResponse.redirect(
-      new URL('/dashboard/settings?spotify=error', req.url)
+      new URL('/settings?spotify=error', baseUrl)
     )
   }
 
@@ -69,6 +69,6 @@ export async function GET(req: NextRequest) {
     })
 
   return NextResponse.redirect(
-    new URL('/dashboard/settings?spotify=connected', req.url)
+    new URL('/settings?spotify=connected', baseUrl)
   )
 }

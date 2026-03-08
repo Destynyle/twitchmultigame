@@ -11,7 +11,7 @@ export default async function IntervenePage({
   params: Promise<{ sessionId: string }>
 }) {
   const session = await auth()
-  if (!session || session.user.role !== 'admin') redirect('/dashboard')
+  if (!session || session.user.role !== 'admin') redirect('/sessions')
 
   const { sessionId } = await params
 
@@ -29,12 +29,12 @@ export default async function IntervenePage({
     .innerJoin(tenants, eq(sessions.tenantId, tenants.id))
     .where(eq(sessions.id, sessionId))
 
-  if (!row) redirect('/dashboard/admin')
+  if (!row) redirect('/admin')
 
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-6">
-        <a href="/dashboard/admin" className="text-sm text-gray-500 hover:text-gray-300">
+        <a href="/admin" className="text-sm text-gray-500 hover:text-gray-300">
           ← Back to monitoring
         </a>
         <h1 className="mt-2 text-2xl font-bold text-white">Remote Intervention</h1>

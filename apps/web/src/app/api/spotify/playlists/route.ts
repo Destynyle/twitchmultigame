@@ -35,7 +35,7 @@ export async function GET() {
       id: p.id,
       name: p.name,
       trackCount: p.tracks.total,
-      imageUrl: p.images[0]?.url ?? null,
+      imageUrl: p.images?.[0]?.url ?? null,
     })),
   })
 }

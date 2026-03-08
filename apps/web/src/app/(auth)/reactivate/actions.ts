@@ -13,7 +13,7 @@ import { auth } from '~/server/auth'
  */
 export async function reactivateAccountAction() {
   const session = await auth()
-  if (!session?.user?.tenantId) redirect('/auth/signin')
+  if (!session?.user?.tenantId) redirect('/signin')
 
   const tenantId = session.user.tenantId
 
@@ -22,5 +22,5 @@ export async function reactivateAccountAction() {
     .set({ deletedAt: null })
     .where(eq(tenants.id, tenantId))
 
-  redirect('/dashboard')
+  redirect('/sessions')
 }

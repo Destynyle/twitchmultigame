@@ -9,7 +9,7 @@ import { getSpotifyToken } from '~/server/spotify'
 
 export async function createSessionAction(formData: FormData) {
   const session = await auth()
-  if (!session?.user?.tenantId) redirect('/auth/signin')
+  if (!session?.user?.tenantId) redirect('/signin')
 
   const gameType = formData.get('gameType') as 'blindtest' | 'quiz'
   const playlistId = formData.get('playlistId') as string
@@ -36,7 +36,7 @@ export async function updateSessionStatusAction(
   action: 'launch' | 'pause' | 'resume' | 'end'
 ) {
   const session = await auth()
-  if (!session?.user?.tenantId) redirect('/auth/signin')
+  if (!session?.user?.tenantId) redirect('/signin')
   const tenantId = session.user.tenantId
 
   const updates: Record<string, unknown> = {}
@@ -96,7 +96,7 @@ export async function updateSessionStatusAction(
 
 export async function nextTrackAction(sessionId: string) {
   const session = await auth()
-  if (!session?.user?.tenantId) redirect('/auth/signin')
+  if (!session?.user?.tenantId) redirect('/signin')
   const tenantId = session.user.tenantId
 
   await withTenantContext(tenantId, async (tx) => {

@@ -8,7 +8,7 @@ export default function SignInPage() {
       <form
         action={async () => {
           'use server'
-          await signIn('twitch', { redirectTo: '/dashboard' })
+          await signIn('twitch', { redirectTo: '/sessions' })
         }}
       >
         <button

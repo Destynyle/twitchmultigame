@@ -13,7 +13,7 @@ import { auth, signOut } from '~/server/auth'
  */
 export async function deleteAccountAction() {
   const session = await auth()
-  if (!session?.user?.tenantId) redirect('/auth/signin')
+  if (!session?.user?.tenantId) redirect('/signin')
 
   const tenantId = session.user.tenantId
 
@@ -31,7 +31,7 @@ export async function deleteAccountAction() {
  */
 export async function disconnectSpotifyAction() {
   const session = await auth()
-  if (!session?.user?.tenantId) redirect('/auth/signin')
+  if (!session?.user?.tenantId) redirect('/signin')
 
   await db
     .delete(oauthTokens)
@@ -42,5 +42,5 @@ export async function disconnectSpotifyAction() {
       )
     )
 
-  redirect('/dashboard/settings?spotify=disconnected')
+  redirect('/settings?spotify=disconnected')
 }

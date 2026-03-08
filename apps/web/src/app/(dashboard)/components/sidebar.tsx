@@ -7,17 +7,17 @@ import { signOutAction } from './sign-out-action'
 import type { Session } from 'next-auth'
 
 const NAV_LINKS = [
-  { href: '/dashboard/sessions', label: 'Sessions' },
-  { href: '/dashboard/playlists', label: 'Playlists' },
-  { href: '/dashboard/overlay', label: 'Overlay Setup' },
-  { href: '/dashboard/settings', label: 'Settings' },
+  { href: '/sessions', label: 'Sessions' },
+  { href: '/playlists', label: 'Playlists' },
+  { href: '/overlay', label: 'Overlay Setup' },
+  { href: '/settings', label: 'Settings' },
 ] as const
 
 const ADMIN_NAV_LINKS = [
-  { href: '/dashboard/admin', label: 'Monitoring' },
-  { href: '/dashboard/admin/users', label: 'Users' },
-  { href: '/dashboard/admin/moderation', label: 'Moderation' },
-  { href: '/dashboard/admin/audit-log', label: 'Audit Log' },
+  { href: '/admin', label: 'Monitoring' },
+  { href: '/admin/users', label: 'Users' },
+  { href: '/admin/moderation', label: 'Moderation' },
+  { href: '/admin/audit-log', label: 'Audit Log' },
 ] as const
 
 interface SidebarProps {
@@ -36,7 +36,7 @@ export function Sidebar({ session }: SidebarProps) {
     >
       {/* Brand */}
       <Link
-        href="/dashboard"
+        href="/sessions"
         className="mb-8 text-xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-gray-900"
       >
         Playground

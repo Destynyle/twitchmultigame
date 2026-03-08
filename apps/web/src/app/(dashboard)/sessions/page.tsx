@@ -8,7 +8,7 @@ import SessionsClient from './components/SessionsClient'
 export default async function SessionsPage() {
   const session = await auth()
   if (!session?.user?.tenantId) {
-    redirect('/auth/signin')
+    redirect('/signin')
   }
 
   const tenantId = session.user.tenantId

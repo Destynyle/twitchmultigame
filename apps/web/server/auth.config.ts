@@ -8,24 +8,29 @@ import { NextResponse } from 'next/server'
  */
 export const authConfig = {
   pages: {
-    signIn: '/auth/signin',
-    error: '/auth/error',
+    signIn: '/signin',
+    error: '/error',
   },
   providers: [],
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user
-      const isDashboard = nextUrl.pathname.startsWith('/dashboard')
-      const isAdminRoute = nextUrl.pathname.startsWith('/dashboard/admin')
+      const pathname = nextUrl.pathname
+      const isProtected =
+        pathname.startsWith('/sessions') ||
+        pathname.startsWith('/playlists') ||
+        pathname.startsWith('/settings') ||
+        pathname.startsWith('/admin')
+      const isAdminRoute = pathname.startsWith('/admin')
 
-      if (isDashboard && !isLoggedIn) {
-        const signInUrl = new URL('/auth/signin', nextUrl.origin)
-        signInUrl.searchParams.set('callbackUrl', nextUrl.pathname)
+      if (isProtected && !isLoggedIn) {
+        const signInUrl = new URL('/signin', nextUrl.origin)
+        signInUrl.searchParams.set('callbackUrl', pathname)
         return NextResponse.redirect(signInUrl)
       }
 
       if (isAdminRoute && auth?.user?.role !== 'admin') {
-        return NextResponse.redirect(new URL('/dashboard', nextUrl.origin))
+        return NextResponse.redirect(new URL('/sessions', nextUrl.origin))
       }
 
       return true

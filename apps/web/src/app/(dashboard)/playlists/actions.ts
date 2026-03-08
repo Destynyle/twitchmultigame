@@ -33,7 +33,7 @@ export async function createPlaylistAction(
 ): Promise<CreatePlaylistResult> {
   const session = await auth()
   if (!session?.user?.tenantId) {
-    redirect('/auth/signin')
+    redirect('/signin')
   }
 
   const tenantId = session.user.tenantId
@@ -140,7 +140,7 @@ export async function deletePlaylistAction(
 ): Promise<DeletePlaylistResult> {
   const session = await auth()
   if (!session?.user?.tenantId) {
-    redirect('/auth/signin')
+    redirect('/signin')
   }
 
   const tenantId = session.user.tenantId
@@ -186,7 +186,7 @@ export async function updatePlaylistAction(data: {
 }): Promise<UpdatePlaylistResult> {
   const session = await auth()
   if (!session?.user?.tenantId) {
-    redirect('/auth/signin')
+    redirect('/signin')
   }
 
   const tenantId = session.user.tenantId

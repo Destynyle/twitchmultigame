@@ -8,7 +8,7 @@ import PlaylistsClient from './components/PlaylistsClient'
 export default async function PlaylistsPage() {
   const session = await auth()
   if (!session?.user?.tenantId) {
-    redirect('/auth/signin')
+    redirect('/signin')
   }
 
   const tenantId = session.user.tenantId

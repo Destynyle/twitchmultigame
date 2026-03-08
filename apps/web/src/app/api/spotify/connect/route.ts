@@ -8,7 +8,7 @@ export async function GET() {
   const session = await auth()
   if (!session?.user?.tenantId) {
     return NextResponse.redirect(
-      new URL('/auth/signin', process.env.NEXTAUTH_URL ?? 'http://localhost:3000')
+      new URL('/signin', process.env.NEXTAUTH_URL ?? 'http://localhost:3000')
     )
   }
 

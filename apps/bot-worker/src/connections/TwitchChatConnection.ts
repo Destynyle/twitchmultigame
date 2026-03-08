@@ -28,7 +28,7 @@ export class TwitchChatConnection implements IChatConnection {
   private reconnectHandler?: () => void
   private disconnectHandler?: () => void
 
-  constructor(private readonly twitchLogin: string, accessToken: string) {
+  constructor(twitchLogin: string, accessToken: string) {
     this.client = new tmi.Client({
       options: { debug: false },
       connection: {

@@ -10,7 +10,7 @@ export default function LandingPage() {
         </p>
       </div>
       <Link
-        href="/auth/signin"
+        href="/signin"
         className="rounded-lg bg-purple-600 px-8 py-4 text-lg font-semibold text-white transition hover:bg-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-gray-950"
       >
         Sign in with Twitch

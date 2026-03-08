@@ -1,14 +1,19 @@
 import { auth } from '../../../../server/auth'
 import { redirect } from 'next/navigation'
-import { getOrCreateOverlayTokenAction } from './actions'
+import { getOrCreateOverlayTokenAction, getThemesAction } from './actions'
 import OverlaySetupClient from './OverlaySetupClient'
 
 export default async function OverlaySetupPage() {
   const session = await auth()
   if (!session?.user?.tenantId) redirect('/signin')
 
-  const result = await getOrCreateOverlayTokenAction()
+  const [result, themesResult] = await Promise.all([
+    getOrCreateOverlayTokenAction(),
+    getThemesAction(),
+  ])
   const token = result.success ? result.token : null
+  const selectedThemeId = result.success ? result.selectedThemeId : null
+  const themes = 'themes' in themesResult ? themesResult.themes : []
 
   return (
     <div className="space-y-6">
@@ -19,7 +24,7 @@ export default async function OverlaySetupPage() {
         </p>
       </div>
       {token ? (
-        <OverlaySetupClient token={token} />
+        <OverlaySetupClient token={token} themes={themes} selectedThemeId={selectedThemeId} />
       ) : (
         <p className="text-red-400">Failed to generate overlay token. Please refresh.</p>
       )}

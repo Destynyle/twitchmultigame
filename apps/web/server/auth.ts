@@ -127,7 +127,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             .where(eq(tenants.id, tenant.id))
 
           token.tenantId = tenant.id
-          token.twitchLogin = tenantRow?.twitchLogin
+          token.twitchLogin = tenantRow?.twitchLogin ?? ''
           token.role = userRow?.role ?? 'free'
           token.subscriptionStatus = userRow?.subscriptionStatus ?? 'free'
         }

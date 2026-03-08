@@ -2,7 +2,7 @@
 import { auth } from '~/server/auth'
 import { redirect } from 'next/navigation'
 import { withTenantContext } from '@playground/db'
-import { sessions, sessionScores, tracks, playlists } from '@playground/db/schema'
+import { sessions, sessionScores, tracks } from '@playground/db/schema'
 import { eq, and, desc, asc } from 'drizzle-orm'
 import { getRedisPublisher, SESSION_CMD_CHANNEL, SESSIONS_EVENTS_CHANNEL } from '~/server/redis'
 import { getSpotifyToken } from '~/server/spotify'

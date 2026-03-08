@@ -20,6 +20,7 @@ type Session = {
 type Playlist = {
   id: string
   name: string
+  sourceType: string
 }
 
 type Props = {

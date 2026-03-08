@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation'
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth()
   if (!session?.user?.tenantId) {
@@ -15,9 +15,9 @@ export async function GET(
   }
 
   const tenantId = session.user.tenantId
-  const playlistId = params.id
+  const { id: playlistId } = await params
 
-  if (!playlistId) {
+  if (!playlistId || typeof playlistId !== 'string') {
     return NextResponse.json({ error: 'Playlist ID is required.' }, { status: 400 })
   }
 

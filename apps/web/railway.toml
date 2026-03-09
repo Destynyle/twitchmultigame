@@ -1,0 +1,12 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm install && npx turbo build --filter=@playground/web"
+
+[deploy]
+startCommand = "node apps/web/.next/standalone/apps/web/server.js"
+healthcheckPath = "/"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+
+[[services]]
+port = 3000

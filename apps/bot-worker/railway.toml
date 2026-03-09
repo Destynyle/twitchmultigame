@@ -1,7 +1,0 @@
-[build]
-builder = "NIXPACKS"
-buildCommand = "pnpm install"
-
-[deploy]
-startCommand = "cd apps/bot-worker && pnpm tsx src/index.ts"
-restartPolicyType = "ON_FAILURE"

@@ -17,6 +17,8 @@ const envSchema = z.object({
   CRON_SECRET: z.string().min(32),
 })
 
-export const env = envSchema.parse(process.env)
+export const env = process.env.SKIP_ENV_VALIDATION
+  ? (process.env as unknown as Env)
+  : envSchema.parse(process.env)
 
 export type Env = z.infer<typeof envSchema>

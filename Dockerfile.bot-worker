@@ -3,4 +3,5 @@ WORKDIR /app
 RUN npm install -g pnpm
 COPY . .
 RUN pnpm install
-CMD ["./node_modules/.bin/tsx", "apps/bot-worker/src/index.ts"]
+WORKDIR /app/apps/bot-worker
+CMD ["npx", "tsx", "src/index.ts"]

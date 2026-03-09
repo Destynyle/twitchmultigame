@@ -33,7 +33,10 @@ export class SessionRunner {
   private subscriber: Redis | null = null
 
   async start(): Promise<void> {
-    this.subscriber = new Redis(REDIS_URL)
+    this.subscriber = new Redis(REDIS_URL, { maxRetriesPerRequest: 3 })
+    this.subscriber.on('error', (err: Error) => {
+      logger.error({ err: err.message }, 'Redis subscriber error')
+    })
     await this.subscriber.subscribe(SESSIONS_EVENTS_CHANNEL)
     this.subscriber.on('message', (_channel: string, message: string) => {
       void this.handleEvent(message)

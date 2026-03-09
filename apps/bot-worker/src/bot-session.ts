@@ -83,7 +83,9 @@ export class BotSession {
 
     // 3. Create Redis clients
     this.publisher = new Redis(this.redisUrl)
+    this.publisher.on('error', (err: Error) => logger.error({ err: err.message }, 'Redis publisher error'))
     this.subscriber = new Redis(this.redisUrl)
+    this.subscriber.on('error', (err: Error) => logger.error({ err: err.message }, 'Redis subscriber error'))
 
     // 4. Register chat message handler
     this.connection.onMessage(async (_channel, username, displayName, text) => {

@@ -2,16 +2,24 @@ import Redis from 'ioredis'
 
 const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379'
 
+function createClient(options?: ConstructorParameters<typeof Redis>[1]): Redis {
+  const client = new Redis(REDIS_URL, { lazyConnect: false, maxRetriesPerRequest: 3, ...options })
+  client.on('error', (err: Error) => {
+    console.error('[redis] connection error:', err.message)
+  })
+  return client
+}
+
 /** Singleton publisher client (shared across requests) */
 let _publisher: Redis | null = null
 export function getRedisPublisher(): Redis {
-  if (!_publisher) _publisher = new Redis(REDIS_URL, { lazyConnect: false })
+  if (!_publisher) _publisher = createClient()
   return _publisher
 }
 
 /** Creates a fresh subscriber client (must be dedicated — not shared with publisher) */
 export function createRedisSubscriber(): Redis {
-  return new Redis(REDIS_URL, { lazyConnect: false })
+  return createClient()
 }
 
 /** Redis pub/sub channel for a given tenant's overlay */

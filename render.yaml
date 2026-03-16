@@ -59,14 +59,15 @@ services:
       - key: TOKEN_ENCRYPTION_KEY
         sync: false
 
+  # ── Redis ─────────────────────────────────────────────────────────────────────
+  - type: redis
+    name: playground-redis
+    plan: free
+    ipAllowList: []
+
 databases:
-  # ── PostgreSQL ───────────────────────────────────────────────────────────────
+  # ── PostgreSQL ────────────────────────────────────────────────────────────────
   - name: playground-db
     plan: free
     databaseName: playground
     user: playground
-
-  # ── Redis ────────────────────────────────────────────────────────────────────
-  - name: playground-redis
-    plan: free
-    ipAllowList: []

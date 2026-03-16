@@ -39,11 +39,10 @@ const STATUS_COLORS: Record<SessionStatus, string> = {
 
 export default function SessionsClient({ initialSessions, playlists }: Props) {
   const router = useRouter()
-  const [sessions] = useState<Session[]>(initialSessions)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showNewForm, setShowNewForm] = useState(false)
 
-  const selectedSession = sessions.find((s) => s.id === selectedId) ?? null
+  const selectedSession = initialSessions.find((s) => s.id === selectedId) ?? null
 
   function handleCreated(sessionId: string) {
     setShowNewForm(false)
@@ -91,11 +90,11 @@ export default function SessionsClient({ initialSessions, playlists }: Props) {
         />
       )}
 
-      {sessions.length === 0 ? (
+      {initialSessions.length === 0 ? (
         <p className="text-gray-400">No sessions yet. Create your first session above.</p>
       ) : (
         <div className="space-y-2">
-          {sessions.map((session) => {
+          {initialSessions.map((session) => {
             const playlist = playlists.find((p) => p.id === session.playlistId)
             return (
               <div

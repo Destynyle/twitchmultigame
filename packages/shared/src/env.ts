@@ -45,5 +45,6 @@ export const env: Env = buildEnv()
 
 /** Call once at web app startup to ensure all web-only vars are present. */
 export function validateWebEnv(): Env {
+  if (process.env.SKIP_ENV_VALIDATION) return process.env as unknown as Env
   return webSchema.parse(process.env)
 }

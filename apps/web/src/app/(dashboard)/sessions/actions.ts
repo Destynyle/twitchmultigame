@@ -118,6 +118,21 @@ export async function nextTrackAction(sessionId: string) {
   return { success: true }
 }
 
+export async function deleteSessionAction(sessionId: string) {
+  const session = await auth()
+  if (!session?.user?.tenantId) redirect('/signin')
+  const tenantId = session.user.tenantId
+
+  await withTenantContext(tenantId, async (tx) => {
+    await tx.delete(sessions).where(and(
+      eq(sessions.id, sessionId),
+      eq(sessions.tenantId, tenantId),
+    ))
+  })
+
+  return { success: true }
+}
+
 export async function getSessionScoresAction(sessionId: string) {
   const session = await auth()
   if (!session?.user?.tenantId) return { error: 'Unauthorized' }

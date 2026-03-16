@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import NewSessionForm from './NewSessionForm'
 import SessionControlPanel from './SessionControlPanel'
 
@@ -37,19 +38,26 @@ const STATUS_COLORS: Record<SessionStatus, string> = {
 }
 
 export default function SessionsClient({ initialSessions, playlists }: Props) {
+  const router = useRouter()
   const [sessions] = useState<Session[]>(initialSessions)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showNewForm, setShowNewForm] = useState(false)
 
   const selectedSession = sessions.find((s) => s.id === selectedId) ?? null
 
-  function handleCreated(_sessionId: string) {
+  function handleCreated(sessionId: string) {
     setShowNewForm(false)
-    window.location.reload()
+    setSelectedId(sessionId)
+    router.refresh()
   }
 
   function handleSessionUpdated(_sessionId: string) {
-    window.location.reload()
+    router.refresh()
+  }
+
+  function handleSessionDeleted(sessionId: string) {
+    if (selectedId === sessionId) setSelectedId(null)
+    router.refresh()
   }
 
   return (
@@ -79,6 +87,7 @@ export default function SessionsClient({ initialSessions, playlists }: Props) {
           session={selectedSession}
           playlists={playlists}
           onSessionUpdated={handleSessionUpdated}
+          onSessionDeleted={handleSessionDeleted}
         />
       )}
 

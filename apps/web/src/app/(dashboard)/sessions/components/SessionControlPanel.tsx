@@ -1,6 +1,6 @@
 'use client'
 import { useState, useTransition, useEffect, useCallback } from 'react'
-import { updateSessionStatusAction, nextTrackAction, getSessionScoresAction } from '../actions'
+import { updateSessionStatusAction, nextTrackAction, getSessionScoresAction, deleteSessionAction } from '../actions'
 import SpotifyPlaybackWidget from './SpotifyPlaybackWidget'
 import YouTubePlayerWidget from './YouTubePlayerWidget'
 
@@ -35,6 +35,7 @@ type Props = {
   session: Session
   playlists: Playlist[]
   onSessionUpdated: (sessionId: string) => void
+  onSessionDeleted: (sessionId: string) => void
 }
 
 const STATUS_LABELS: Record<SessionStatus, string> = {
@@ -53,7 +54,7 @@ const STATUS_COLORS: Record<SessionStatus, string> = {
   test_ended: 'bg-gray-500',
 }
 
-export default function SessionControlPanel({ session, playlists, onSessionUpdated }: Props) {
+export default function SessionControlPanel({ session, playlists, onSessionUpdated, onSessionDeleted }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [scores, setScores] = useState<ScoreRow[] | null>(null)
@@ -72,6 +73,14 @@ export default function SessionControlPanel({ session, playlists, onSessionUpdat
       } else {
         onSessionUpdated(session.id)
       }
+    })
+  }
+
+  function handleDelete() {
+    if (!confirm('Delete this session?')) return
+    startTransition(async () => {
+      await deleteSessionAction(session.id)
+      onSessionDeleted(session.id)
     })
   }
 
@@ -201,6 +210,15 @@ export default function SessionControlPanel({ session, playlists, onSessionUpdat
             className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded font-medium"
           >
             End
+          </button>
+        )}
+        {!isActiveOrPaused && (
+          <button
+            onClick={handleDelete}
+            disabled={isPending}
+            className="bg-red-800 hover:bg-red-900 disabled:opacity-50 text-white px-4 py-2 rounded font-medium"
+          >
+            Delete
           </button>
         )}
       </div>

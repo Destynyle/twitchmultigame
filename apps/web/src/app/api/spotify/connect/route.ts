@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { auth } from '~/server/auth'
 import { env } from '@playground/shared/env'
 
-const SPOTIFY_SCOPES = 'playlist-read-private playlist-read-collaborative'
+const SPOTIFY_SCOPES =
+  'playlist-read-private playlist-read-collaborative streaming user-read-playback-state user-modify-playback-state'
 
 export async function GET() {
   const session = await auth()

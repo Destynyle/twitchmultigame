@@ -1,7 +1,8 @@
 import NextAuth from 'next-auth'
 import Twitch from 'next-auth/providers/twitch'
 import { eq } from 'drizzle-orm'
-import { db } from '@playground/db'
+import { randomUUID } from 'crypto'
+import { db, withTenantContext } from '@playground/db'
 import { tenants, users, oauthTokens } from '@playground/db/schema'
 import { env } from '@playground/shared/env'
 import { encrypt } from '@playground/shared/utils/encrypt'
@@ -53,19 +54,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       if (existing.length === 0) {
         // First login — provision tenant + user
-        const [newTenant] = await db
-          .insert(tenants)
-          .values({ twitchId, twitchLogin, displayName })
-          .returning({ id: tenants.id })
-        if (!newTenant) return false
-        tenantId = newTenant.id
-
-        await db.insert(users).values({
-          tenantId,
-          twitchId,
-          role: 'free',
-          subscriptionStatus: 'free',
+        // Use withTenantContext so app.current_tenant_id is set during INSERT,
+        // satisfying the tenants_self_isolation RLS policy's WITH CHECK.
+        const newTenantId = randomUUID()
+        await withTenantContext(newTenantId, async (tx) => {
+          await tx.insert(tenants).values({ id: newTenantId, twitchId, twitchLogin, displayName })
+          await tx.insert(users).values({
+            tenantId: newTenantId,
+            twitchId,
+            role: 'free',
+            subscriptionStatus: 'free',
+          })
         })
+        tenantId = newTenantId
       } else {
         tenantId = existing[0]!.id
       }
@@ -79,23 +80,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         ? new Date(account.expires_at * 1000)
         : null
 
-      await db
-        .insert(oauthTokens)
-        .values({
-          tenantId,
-          provider: 'twitch',
-          encryptedAccessToken: encryptedAccess,
-          encryptedRefreshToken: encryptedRefresh,
-          expiresAt,
-        })
-        .onConflictDoUpdate({
-          target: [oauthTokens.tenantId, oauthTokens.provider],
-          set: {
+      await withTenantContext(tenantId, async (tx) => {
+        await tx
+          .insert(oauthTokens)
+          .values({
+            tenantId,
+            provider: 'twitch',
             encryptedAccessToken: encryptedAccess,
             encryptedRefreshToken: encryptedRefresh,
             expiresAt,
-          },
-        })
+          })
+          .onConflictDoUpdate({
+            target: [oauthTokens.tenantId, oauthTokens.provider],
+            set: {
+              encryptedAccessToken: encryptedAccess,
+              encryptedRefreshToken: encryptedRefresh,
+              expiresAt,
+            },
+          })
+      })
 
       return true
     },

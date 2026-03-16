@@ -96,52 +96,52 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GAME-01 | — | Pending |
-| GAME-02 | — | Pending |
-| GAME-03 | — | Pending |
-| GAME-04 | — | Pending |
-| GAME-05 | — | Pending |
-| GAME-06 | — | Pending |
-| GAME-07 | — | Pending |
-| GAME-08 | — | Pending |
-| SPOT-01 | — | Pending |
-| SPOT-02 | — | Pending |
-| SPOT-03 | — | Pending |
-| BOT-01 | — | Pending |
-| BOT-02 | — | Pending |
-| BOT-03 | — | Pending |
-| BOT-04 | — | Pending |
-| BOT-05 | — | Pending |
-| BOT-06 | — | Pending |
-| BOT-07 | — | Pending |
-| BOT-08 | — | Pending |
-| BOT-09 | — | Pending |
-| BOT-10 | — | Pending |
-| BOT-11 | — | Pending |
-| BOT-12 | — | Pending |
-| OVRL-01 | — | Pending |
-| OVRL-02 | — | Pending |
-| OVRL-03 | — | Pending |
-| OVRL-04 | — | Pending |
-| OVRL-05 | — | Pending |
-| OVRL-06 | — | Pending |
-| DASH-01 | — | Pending |
-| DASH-02 | — | Pending |
-| DASH-03 | — | Pending |
-| DASH-04 | — | Pending |
-| SCORE-01 | — | Pending |
-| SCORE-02 | — | Pending |
-| SCORE-03 | — | Pending |
-| SCORE-04 | — | Pending |
-| GUIDE-01 | — | Pending |
-| GUIDE-02 | — | Pending |
-| GUIDE-03 | — | Pending |
+| GAME-01 | Phase 6 | Pending |
+| GAME-02 | Phase 6 | Pending |
+| GAME-03 | Phase 6 | Pending |
+| GAME-04 | Phase 6 | Pending |
+| GAME-05 | Phase 6 | Pending |
+| GAME-06 | Phase 6 | Pending |
+| GAME-07 | Phase 6 | Pending |
+| GAME-08 | Phase 6 | Pending |
+| SPOT-01 | Phase 7 | Pending |
+| SPOT-02 | Phase 7 | Pending |
+| SPOT-03 | Phase 7 | Pending |
+| BOT-01 | Phase 8 | Pending |
+| BOT-02 | Phase 8 | Pending |
+| BOT-03 | Phase 8 | Pending |
+| BOT-04 | Phase 8 | Pending |
+| BOT-05 | Phase 8 | Pending |
+| BOT-06 | Phase 8 | Pending |
+| BOT-07 | Phase 8 | Pending |
+| BOT-08 | Phase 8 | Pending |
+| BOT-09 | Phase 8 | Pending |
+| BOT-10 | Phase 8 | Pending |
+| BOT-11 | Phase 8 | Pending |
+| BOT-12 | Phase 8 | Pending |
+| OVRL-01 | Phase 9 | Pending |
+| OVRL-02 | Phase 9 | Pending |
+| OVRL-03 | Phase 9 | Pending |
+| OVRL-04 | Phase 9 | Pending |
+| OVRL-05 | Phase 9 | Pending |
+| OVRL-06 | Phase 9 | Pending |
+| DASH-01 | Phase 10 | Pending |
+| DASH-02 | Phase 10 | Pending |
+| DASH-03 | Phase 10 | Pending |
+| DASH-04 | Phase 10 | Pending |
+| SCORE-01 | Phase 11 | Pending |
+| SCORE-02 | Phase 11 | Pending |
+| SCORE-03 | Phase 11 | Pending |
+| SCORE-04 | Phase 11 | Pending |
+| GUIDE-01 | Phase 12 | Pending |
+| GUIDE-02 | Phase 12 | Pending |
+| GUIDE-03 | Phase 12 | Pending |
 
 **Coverage:**
-- v2 requirements: 39 total
-- Mapped to phases: 0
-- Unmapped: 39 ⚠️ (roadmap pending)
+- v2 requirements: 40 total
+- Mapped to phases: 40
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-17*
-*Last updated: 2026-03-17 after initial definition*
+*Last updated: 2026-03-17 — traceability populated after roadmap creation*

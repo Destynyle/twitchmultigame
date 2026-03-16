@@ -1,0 +1,28 @@
+# Dependencies (rebuilt in Docker)
+node_modules
+**/node_modules
+
+# Build outputs
+.next
+**/dist
+**/.turbo
+
+# Local env files
+.env.local
+.env*.local
+
+# Git
+.git
+.gitignore
+
+# Dev files
+*.md
+.planning
+_bmad
+_bmad-output
+testbmad
+
+# Misc
+*.webm
+*.mp4
+docker-compose.yml

@@ -39,3 +39,9 @@ coverage/
 
 # TypeScript
 *.tsbuildinfo
+
+# Large media files
+*.webm
+*.mp4
+*.mkv
+*.avi

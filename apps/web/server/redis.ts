@@ -1,8 +1,8 @@
-import Redis from 'ioredis'
+import Redis, { type RedisOptions } from 'ioredis'
 
 const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379'
 
-function createClient(options?: ConstructorParameters<typeof Redis>[1]): Redis {
+function createClient(options?: RedisOptions): Redis {
   const client = new Redis(REDIS_URL, { lazyConnect: false, maxRetriesPerRequest: 3, ...options })
   client.on('error', (err: Error) => {
     console.error('[redis] connection error:', err.message)

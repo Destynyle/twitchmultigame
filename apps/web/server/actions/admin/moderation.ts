@@ -67,8 +67,8 @@ export async function getModerationQueueAction(
 
     // Fetch content previews for playlists
     const playlistIds = [...groupMap.values()]
-      .filter((g) => g.contentType === 'playlist')
-      .map((g) => g.contentId)
+      .filter((g: ReportGroup) => g.contentType === 'playlist')
+      .map((g: ReportGroup) => g.contentId)
 
     if (playlistIds.length > 0) {
       const playlistRows = await db
@@ -76,7 +76,7 @@ export async function getModerationQueueAction(
         .from(playlists)
         .where(inArray(playlists.id, playlistIds))
 
-      const nameMap = new Map(playlistRows.map((p) => [p.id, p.name]))
+      const nameMap = new Map<string, string>(playlistRows.map((p: { id: string; name: string | null }) => [p.id, p.name ?? ''] as [string, string]))
       for (const group of groupMap.values()) {
         if (group.contentType === 'playlist') {
           group.contentPreview = nameMap.get(group.contentId) ?? `Playlist ${group.contentId.slice(0, 8)}`
@@ -85,7 +85,7 @@ export async function getModerationQueueAction(
     }
 
     const groups = [...groupMap.values()].sort(
-      (a, b) => a.firstReportedAt.getTime() - b.firstReportedAt.getTime()
+      (a: ReportGroup, b: ReportGroup) => a.firstReportedAt.getTime() - b.firstReportedAt.getTime()
     )
 
     return { groups }

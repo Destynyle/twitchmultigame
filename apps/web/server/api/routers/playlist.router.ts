@@ -111,7 +111,7 @@ export const playlistRouter = createTRPCRouter({
         }
 
         // Insert all tracks
-        const trackValues = input.tracks.map((trackInput, index) => ({
+        const trackValues = input.tracks.map((trackInput: z.infer<typeof trackInputSchema>, index: number) => ({
           playlistId: playlist.id,
           tenantId,
           title: trackInput.title,
@@ -188,7 +188,7 @@ export const playlistRouter = createTRPCRouter({
 
           let insertedTracks: (typeof tracks.$inferSelect)[] = []
           if (input.tracks.length > 0) {
-            const trackValues = input.tracks.map((trackInput, index) => ({
+            const trackValues = input.tracks.map((trackInput: z.infer<typeof trackInputSchema>, index: number) => ({
               playlistId: input.id,
               tenantId,
               title: trackInput.title,

@@ -94,6 +94,8 @@ vi.mock('ioredis', () => ({
         sharedState.publishedMessages.push({ channel, message })
         return 1
       }),
+      setex: vi.fn(async () => 'OK'),
+      del: vi.fn(async () => 1),
       subscribe: vi.fn(async () => {}),
       unsubscribe: vi.fn(async () => {}),
       disconnect: vi.fn(),

@@ -197,8 +197,10 @@ export async function getQuarantineQueueAction(): Promise<{
 
     if (quarantinedUsers.length === 0) return { queue: [] }
 
+    type QuarantinedUser = { tenantId: string; twitchLogin: string; displayName: string }
+
     // Fetch last quarantine log entry per tenant
-    const tenantIds = quarantinedUsers.map((u) => u.tenantId)
+    const tenantIds = quarantinedUsers.map((u: QuarantinedUser) => u.tenantId)
     const logEntries = await db
       .select({
         targetId: adminAuditLog.targetId,
@@ -223,7 +225,7 @@ export async function getQuarantineQueueAction(): Promise<{
       }
     }
 
-    const queue = quarantinedUsers.map((u) => {
+    const queue = quarantinedUsers.map((u: QuarantinedUser) => {
       const log = latestMap.get(u.tenantId)
       return {
         tenantId: u.tenantId,

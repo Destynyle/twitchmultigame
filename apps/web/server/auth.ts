@@ -3,7 +3,10 @@ import Twitch from 'next-auth/providers/twitch'
 import { eq } from 'drizzle-orm'
 import { db } from '@playground/db'
 import { tenants, users, oauthTokens } from '@playground/db/schema'
-import { env } from '@playground/shared/env'
+import { env, validateWebEnv } from '@playground/shared/env'
+
+// Validate web-only env vars at startup — fails fast if any are missing
+validateWebEnv()
 import { encrypt } from '@playground/shared/utils/encrypt'
 import { authConfig } from './auth.config'
 

@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server'
  * Used by middleware.ts which runs at the edge.
  */
 export const authConfig = {
+  trustHost: true,
   pages: {
     signIn: '/signin',
     error: '/error',

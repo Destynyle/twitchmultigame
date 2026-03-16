@@ -85,6 +85,13 @@
       "when": 1773615000000,
       "tag": "0011_rls_insert_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1773701400000,
+      "tag": "0012_no_force_rls",
+      "breakpoints": true
     }
   ]
 }

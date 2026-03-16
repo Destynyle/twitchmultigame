@@ -78,6 +78,13 @@
       "when": 1741651200000,
       "tag": "0010_content_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1773615000000,
+      "tag": "0011_rls_insert_policies",
+      "breakpoints": true
     }
   ]
 }

@@ -48,7 +48,12 @@
   3. A viewer who types a malus trap term loses points; the trap terms are configured per playlist by the streamer.
   4. A viewer who submits title and artist in one message receives bonus points if both are correct, and zero points for both if only one is correct.
   5. Concurrent correct guesses from multiple viewers never produce lost score increments (atomic DB upsert in place).
-**Plans**: TBD
+**Plans:** 4 plans
+Plans:
+- [ ] 06-01-PLAN.md — DB schema migration + type contracts + test stubs
+- [ ] 06-02-PLAN.md — BlindtestPlugin v2 (timing window, malus, double-shot, featurings) [TDD]
+- [ ] 06-03-PLAN.md — Fisher-Yates shuffle + configurable window duration
+- [ ] 06-04-PLAN.md — BotSession v2 (streak multiplier, atomic upsert, Redis round state)
 
 ### Phase 7: Spotify Import Cleanup
 **Goal**: Spotify track data is automatically cleaned on import, and streamers can manually correct titles, artists, and featurings before a session.
@@ -126,7 +131,7 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10 → 11 → 12
 | 3. Spotify Integration | v1.0 | - | Complete | 2026-03 |
 | 4. Overlay SSE | v1.0 | - | Complete | 2026-03 |
 | 5. Admin and Moderation | v1.0 | - | Complete | 2026-03 |
-| 6. Game Engine Foundation | v2.0 | 0/? | Not started | - |
+| 6. Game Engine Foundation | v2.0 | 0/4 | In progress | - |
 | 7. Spotify Import Cleanup | v2.0 | 0/? | Not started | - |
 | 8. Bot Auto-Messages and Chat Commands | v2.0 | 0/? | Not started | - |
 | 9. Overlay Zone Redesign | v2.0 | 0/? | Not started | - |

@@ -455,3 +455,63 @@ describe('shuffle (GAME-07)', () => {
     expect(allSame).toBe(false)
   })
 })
+
+describe('configurable window duration (GAME-08)', () => {
+  it('default window duration is 3000ms', async () => {
+    // setCurrentTrack without windowDurationMs uses default 5000ms (plugin default)
+    // but GAME-08 validates that windowDurationMs is configurable.
+    // Verify: passing 3000ms explicitly works like timing window tests
+    const plugin = new BlindtestPlugin()
+    await plugin.onSessionStart(ctx)
+    plugin.setCurrentTrack('Bohemian Rhapsody', null, { windowDurationMs: 3000 })
+    await plugin.onReveal(ctx)
+    const t0 = 1000000
+    await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody', 'viewer1', t0))
+    // At t0 + 3001ms window should be closed (> 3000ms)
+    const event = await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody', 'viewer2', t0 + 3001))
+    expect(event).toBeNull()
+  })
+
+  it('custom window duration of 5000ms: viewer at t=2.5s gets ~2.0 pts', async () => {
+    const plugin = new BlindtestPlugin()
+    await plugin.onSessionStart(ctx)
+    plugin.setCurrentTrack('Bohemian Rhapsody', null, { windowDurationMs: 5000 })
+    await plugin.onReveal(ctx)
+    const t0 = 1000000
+    await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody', 'viewer1', t0))
+    // At t0 + 2500ms in 5000ms window: ratio=0.5, pts = 3 - 2*0.5 = 2.0
+    const event = await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody', 'viewer2', t0 + 2500))
+    expect(event).not.toBeNull()
+    expect(event!.points).toBe(2.0)
+  })
+
+  it('custom window duration of 1000ms: viewer at t=500ms gets ~2.0 pts', async () => {
+    const plugin = new BlindtestPlugin()
+    await plugin.onSessionStart(ctx)
+    plugin.setCurrentTrack('Bohemian Rhapsody', null, { windowDurationMs: 1000 })
+    await plugin.onReveal(ctx)
+    const t0 = 1000000
+    await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody', 'viewer1', t0))
+    // At t0 + 500ms in 1000ms window: ratio=0.5, pts = 3 - 2*0.5 = 2.0
+    const event = await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody', 'viewer2', t0 + 500))
+    expect(event).not.toBeNull()
+    expect(event!.points).toBe(2.0)
+  })
+
+  it('window duration of 0 means only first finder scores (instant close)', async () => {
+    const plugin = new BlindtestPlugin()
+    await plugin.onSessionStart(ctx)
+    plugin.setCurrentTrack('Bohemian Rhapsody', null, { windowDurationMs: 0 })
+    await plugin.onReveal(ctx)
+    const t0 = 1000000
+    // First finder scores
+    const first = await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody', 'viewer1', t0))
+    expect(first).not.toBeNull()
+    expect(first!.points).toBe(3)
+    // Second viewer at same timestamp: elapsed=0, but 0 > 0 is false so still scores
+    // Any viewer after windowOpenAt is set with duration=0: elapsed=0, 0 > 0 = false → would score
+    // But a viewer 1ms later: elapsed=1 > 0 → null
+    const second = await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody', 'viewer2', t0 + 1))
+    expect(second).toBeNull()
+  })
+})

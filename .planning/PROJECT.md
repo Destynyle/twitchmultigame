@@ -80,11 +80,11 @@ The streamer can run an engaging live blindtest on their Twitch stream with zero
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Fuzzy matching: Sørensen-Dice bigrammes, seuil 0.8 | Tolerant of typos, common in French streams | — Pending |
-| Fenêtre de grattage: 3s configurable | Gives latecomers a chance, prevents winner-takes-all | — Pending |
-| Double shot: lose ALL points if only one correct | Pure high-risk bonus, as designed | — Pending |
-| Streak breaks on wrong answer (including malus) | Punishes spam-guessing behavior | — Pending |
+| Fuzzy matching: Sørensen-Dice bigrammes, seuil 0.8 | Tolerant of typos, common in French streams | Validated in Phase 06: tolerance tightened to 0.15 |
+| Fenêtre de grattage: 3s configurable | Gives latecomers a chance, prevents winner-takes-all | Validated in Phase 06: loaded from gameConfigs.config.windowDurationMs |
+| Double shot: lose ALL points if only one correct | Pure high-risk bonus, as designed | Validated in Phase 06: checkDoubleShot all-or-nothing, 8 passing tests |
+| Streak breaks on wrong answer (including malus) | Punishes spam-guessing behavior | Validated in Phase 06: processStreaksAtRoundEnd + RoundStateManager |
 | 3 overlay zones as separate URL paths | OBS browser source crop flexibility | — Pending |
 
 ---
-*Last updated: 2026-03-17 — Milestone v2.0 started*
+*Last updated: 2026-03-18 — Phase 06 complete (game-engine-foundation)*

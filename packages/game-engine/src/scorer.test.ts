@@ -425,8 +425,33 @@ describe('featurings (GAME-05)', () => {
   })
 })
 
+import { fisherYatesShuffle } from './shuffle'
+
 describe('shuffle (GAME-07)', () => {
-  it.todo('Fisher-Yates produces a permutation of all indices')
-  it.todo('every index appears exactly once')
-  it.todo('shuffle result is different from sorted order (statistical)')
+  it('produces array of correct length', () => {
+    const result = fisherYatesShuffle(10)
+    expect(result).toHaveLength(10)
+  })
+
+  it('every index appears exactly once', () => {
+    const result = fisherYatesShuffle(20)
+    const sorted = [...result].sort((a, b) => a - b)
+    expect(sorted).toEqual(Array.from({ length: 20 }, (_, i) => i))
+  })
+
+  it('returns empty array for length 0', () => {
+    expect(fisherYatesShuffle(0)).toEqual([])
+  })
+
+  it('returns [0] for length 1', () => {
+    expect(fisherYatesShuffle(1)).toEqual([0])
+  })
+
+  it('produces different order from sorted (statistical)', () => {
+    // Run 5 shuffles of 20 items — at least one should differ from sorted
+    const sorted = Array.from({ length: 20 }, (_, i) => i)
+    const results = Array.from({ length: 5 }, () => fisherYatesShuffle(20))
+    const allSame = results.every(r => JSON.stringify(r) === JSON.stringify(sorted))
+    expect(allSame).toBe(false)
+  })
 })

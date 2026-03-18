@@ -8,14 +8,14 @@
 
 ### Gameplay Engine
 
-- [ ] **GAME-01**: Viewer answers are scored within a 3-second window after the first correct guess (first finder gets max points, others in window get fewer)
-- [ ] **GAME-02**: Streak multiplier accumulates when a viewer finds at least one answer per consecutive round; breaks on a miss or wrong answer (including malus)
-- [ ] **GAME-03**: Streamer can configure malus trap terms per playlist; a viewer who types a trap word loses points multiplicatively on that round
-- [ ] **GAME-04**: Viewer can submit title + artist in one message (double-shot): both correct = bonus points; only one correct = zero points for both
-- [ ] **GAME-05**: Featuring guesses are scored instantly (no 3-second window) — each featuring is guessable independently
-- [ ] **GAME-06**: Scoring state (per-round scores, streaks, active window) is preserved in memory with atomic DB writes to prevent lost increments on concurrent guesses
-- [ ] **GAME-07**: Streamer can play the playlist in shuffle order (Fisher-Yates, non-repetitive — each track plays once before any repeats)
-- [ ] **GAME-08**: Streamer can configure the scoring window duration per session (default 3s)
+- [x] **GAME-01**: Viewer answers are scored within a 3-second window after the first correct guess (first finder gets max points, others in window get fewer)
+- [x] **GAME-02**: Streak multiplier accumulates when a viewer finds at least one answer per consecutive round; breaks on a miss or wrong answer (including malus)
+- [x] **GAME-03**: Streamer can configure malus trap terms per playlist; a viewer who types a trap word loses points multiplicatively on that round
+- [x] **GAME-04**: Viewer can submit title + artist in one message (double-shot): both correct = bonus points; only one correct = zero points for both
+- [x] **GAME-05**: Featuring guesses are scored instantly (no 3-second window) — each featuring is guessable independently
+- [x] **GAME-06**: Scoring state (per-round scores, streaks, active window) is preserved in memory with atomic DB writes to prevent lost increments on concurrent guesses
+- [x] **GAME-07**: Streamer can play the playlist in shuffle order (Fisher-Yates, non-repetitive — each track plays once before any repeats)
+- [x] **GAME-08**: Streamer can configure the scoring window duration per session (default 3s)
 
 ### Spotify Import Cleanup
 
@@ -96,14 +96,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GAME-01 | Phase 6 | Pending |
-| GAME-02 | Phase 6 | Pending |
-| GAME-03 | Phase 6 | Pending |
-| GAME-04 | Phase 6 | Pending |
-| GAME-05 | Phase 6 | Pending |
-| GAME-06 | Phase 6 | Pending |
-| GAME-07 | Phase 6 | Pending |
-| GAME-08 | Phase 6 | Pending |
+| GAME-01 | Phase 6 | Complete |
+| GAME-02 | Phase 6 | Complete |
+| GAME-03 | Phase 6 | Complete |
+| GAME-04 | Phase 6 | Complete |
+| GAME-05 | Phase 6 | Complete |
+| GAME-06 | Phase 6 | Complete |
+| GAME-07 | Phase 6 | Complete |
+| GAME-08 | Phase 6 | Complete |
 | SPOT-01 | Phase 7 | Pending |
 | SPOT-02 | Phase 7 | Pending |
 | SPOT-03 | Phase 7 | Pending |

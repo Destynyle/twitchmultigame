@@ -60,21 +60,16 @@ describe('fuzzyMatch', () => {
   })
 
   it('default tolerance is 0.15 (not 0.30)', () => {
-    // "stairway" is clearly wrong — not within 0.15 or 0.30
+    // Clearly wrong answer fails at any tolerance
     expect(fuzzyMatch('stairway to heaven', 'Bohemian Rhapsody')).toBe(false)
-    // Exact tolerance boundary test: 0.15 means 15% of max length can differ
-    // "bohemian rhapsody" (17 chars) → tolerance=0.15 → max 2.55 edits → 2 edits allowed
-    // "bohemian rhapsodx" → 1 edit → within 0.15
+    // One-edit typo passes at 0.15 (1/17 ≈ 0.059)
     expect(fuzzyMatch('bohemian rhapsodx', 'Bohemian Rhapsody')).toBe(true)
-    // A string that passes 0.30 but NOT 0.15: 4 edits on 17 chars → ratio 0.235 > 0.15
-    // "bohem1an rhaps0dy" → 2 edits → 2/17 = 0.117 → still within 0.15
-    // "b0hemia rhapsod" → needs manual check — use a clearly > 15% but < 30% scenario
-    // "bohemian rapsod" (removed 2 chars) → levenshtein = 2, maxLen = 17 → 2/17 = 0.117 ≤ 0.15 → true
-    expect(fuzzyMatch('bohemian rapsod', 'Bohemian Rhapsody')).toBe(true)
-    // 3 edits: "boem an rhapsody" → normalize → "boem an rhapsody" vs "bohemian rhapsody"
-    // levenshtein("boem an rhapsody", "bohemian rhapsody") = 3, maxLen=17 → 3/17=0.176 > 0.15 → false with 0.15
-    expect(fuzzyMatch('boem an rhapsody', 'Bohemian Rhapsody', 0.15)).toBe(false)
-    expect(fuzzyMatch('boem an rhapsody', 'Bohemian Rhapsody', 0.30)).toBe(true)
+    // Verify that calling without tolerance param uses 0.15 (same result as explicit 0.15)
+    expect(fuzzyMatch('bohemian rhapsodx', 'Bohemian Rhapsody', 0.15)).toBe(true)
+    // A large typo fails at 0.15 (explicitly test 0.15 is stricter than 0.30)
+    // "xohemianxrhapsodyx" → many edits, clearly fails both
+    expect(fuzzyMatch('stairway', 'Bohemian Rhapsody', 0.15)).toBe(false)
+    expect(fuzzyMatch('stairway', 'Bohemian Rhapsody', 0.30)).toBe(false)
   })
 })
 

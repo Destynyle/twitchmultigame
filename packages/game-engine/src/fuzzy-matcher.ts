@@ -25,7 +25,7 @@ function levenshtein(a: string, b: string): number {
 
 /**
  * Returns true if `input` fuzzy-matches `target` within the given
- * Levenshtein tolerance ratio (default 0.30 = 30%).
+ * Levenshtein tolerance ratio (default 0.15 = 15%).
  *
  * Match is positive if:
  * - the normalized input contains the normalized target as a substring, OR
@@ -33,7 +33,7 @@ function levenshtein(a: string, b: string): number {
  *
  * Very short targets (< 3 chars) require an exact match or substring inclusion.
  */
-export function fuzzyMatch(input: string, target: string, tolerance = 0.30): boolean {
+export function fuzzyMatch(input: string, target: string, tolerance = 0.15): boolean {
   const normInput = normalize(input)
   const normTarget = normalize(target)
 

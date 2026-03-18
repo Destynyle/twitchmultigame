@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Funnier and Prettier Blindtest
-status: unknown
-stopped_at: Completed 06-03-PLAN.md
-last_updated: "2026-03-18T18:27:34.643Z"
+status: phase_complete
+stopped_at: Completed 06-04-PLAN.md
+last_updated: "2026-03-18T18:31:00Z"
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 
 ## Current Position
 
-Phase: 06 (game-engine-foundation) — EXECUTING
-Plan: 3 of 4
+Phase: 06 (game-engine-foundation) — COMPLETE
+Plan: 4 of 4
 
 ## Performance Metrics
 
@@ -44,6 +44,7 @@ Plan: 3 of 4
 | Phase 06-game-engine-foundation P01 | 3min | 3 tasks | 5 files |
 | Phase 06 P02 | 5min | 3 tasks | 3 files |
 | Phase 06-game-engine-foundation P03 | 3min | 2 tasks | 3 files |
+| Phase 06-game-engine-foundation P04 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,9 @@ Plan: 3 of 4
 - [06-02] Post-window guess returns null without consuming answeredViewers slot — viewer's guess not wasted
 - [06-03] GAME-08 window duration tests implemented as real passing tests (Plan 02 already shipped windowDurationMs)
 - [06-03] window=0 behavior: first finder scores (elapsed=0), subsequent viewers (elapsed>=1ms) get null — instant close
+- [06-04] RoundStateManager uses publisher Redis instance (not new connection) to avoid extra connections per session
+- [06-04] Shuffle order: DB-first recovery strategy (sessions.shuffleOrder), then Redis game:shuffle: key, then generate new
+- [06-04] Streak multiplier applied only to positive-point events (not featuring, not malus)
 
 ### Pending Todos
 
@@ -76,11 +80,11 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 6]: Double-shot penalty design RESOLVED — all-or-nothing confirmed and implemented in 06-02
-- [Phase 6]: Redis game state persistence key schema for crash recovery needs spec before coding
+- [Phase 6]: Redis game state persistence key schema RESOLVED — game:round:, game:streak:, game:shuffle: implemented in 06-04
 - [Phase 8]: Streamers must add bot as moderator for 100 msg/30s budget — needs UX surface in dashboard
 
 ## Session Continuity
 
-Last session: 2026-03-18T18:27:34.638Z
-Stopped at: Completed 06-03-PLAN.md
+Last session: 2026-03-18T18:31:00Z
+Stopped at: Completed 06-04-PLAN.md
 Resume file: None

@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, pgEnum, pgPolicy, index, integer, jsonb } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, timestamp, pgEnum, pgPolicy, index, integer, jsonb, numeric } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { tenants } from './tenants'
 import { playlists } from './playlists'
@@ -17,6 +17,7 @@ export const sessions = pgTable('sessions', {
   status: sessionStatusEnum('status').notNull().default('pending'),
   isTestMode: text('is_test_mode').notNull().default('false'),
   currentTrackIndex: integer('current_track_index').notNull().default(0),
+  shuffleOrder: jsonb('shuffle_order'),
   startedAt: timestamp('started_at', { withTimezone: true }),
   endedAt: timestamp('ended_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -37,7 +38,8 @@ export const sessionScores = pgTable('session_scores', {
   viewerUsername: text('viewer_username').notNull(),
   viewerDisplayName: text('viewer_display_name').notNull(),
   gameType: gameTypeEnum('game_type').notNull(),
-  score: integer('score').notNull().default(0),
+  score: numeric('score', { precision: 10, scale: 1 }).notNull().default('0'),
+  streak: integer('streak').notNull().default(0),
   correctAnswers: integer('correct_answers').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

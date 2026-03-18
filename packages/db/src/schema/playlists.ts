@@ -25,6 +25,7 @@ export const playlists = pgTable(
     // external playlist ID if imported
     sourceId: text('source_id'),
     trackCount: integer('track_count').notNull().default(0),
+    malusTerms: text('malus_terms').array().default(sql`'{}'::text[]`),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -58,6 +59,7 @@ export const tracks = pgTable(
       .references(() => tenants.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     artist: text('artist'),
+    featurings: text('featurings').array().default(sql`'{}'::text[]`),
     durationSeconds: integer('duration_seconds'),
     // 'manual' | 'spotify' | 'youtube'
     sourceType: text('source_type'),

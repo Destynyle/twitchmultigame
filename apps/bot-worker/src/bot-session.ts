@@ -1,13 +1,19 @@
 import Redis from 'ioredis'
 import { withTenantContext } from '@playground/db'
-import { sessions, sessionScores, tracks } from '@playground/db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { sessions, sessionScores, tracks, gameConfigs, playlists } from '@playground/db/schema'
+import { eq, desc, sql } from 'drizzle-orm'
 import type { GamePlugin, ScoringEvent } from '@playground/game-types'
 import type { IChatConnection } from './connections/IChatConnection'
 import { logger } from './logger'
+import { RoundStateManager } from './round-state'
+import { fisherYatesShuffle } from '@playground/game-engine'
 
 type PluginWithTrack = GamePlugin & {
-  setCurrentTrack(title: string, artist: string | null): void
+  setCurrentTrack(title: string, artist: string | null, options?: {
+    featurings?: string[]
+    malusTerms?: string[]
+    windowDurationMs?: number
+  }): void
 }
 
 interface LeaderboardEntry {
@@ -38,6 +44,14 @@ export class BotSession {
   private currentTrackArtist: string | null = null
   private stopped = false
 
+  // v2 fields
+  private roundState: RoundStateManager | null = null
+  private windowDurationMs = 3000  // default, overridden from gameConfigs
+  private malusTerms: string[] = []
+  private shuffleOrder: number[] | null = null
+  private trackList: Array<{ title: string; artist: string | null; position: number; featurings: string[] }> = []
+  private allParticipantsThisRound: Set<string> = new Set()
+
   constructor(params: BotSessionParams) {
     this.sessionId = params.sessionId
     this.tenantId = params.tenantId
@@ -60,23 +74,21 @@ export class BotSession {
     }
 
     const playlistId = sessionRow.playlistId
-    let trackList: Array<{ title: string; artist: string | null; position: number }> = []
 
     if (playlistId) {
-      trackList = await withTenantContext(this.tenantId, async (tx) => {
+      this.trackList = await withTenantContext(this.tenantId, async (tx) => {
         return tx
-          .select({ title: tracks.title, artist: tracks.artist, position: tracks.position })
+          .select({
+            title: tracks.title,
+            artist: tracks.artist,
+            position: tracks.position,
+            featurings: tracks.featurings,
+          })
           .from(tracks)
           .where(eq(tracks.playlistId, playlistId))
           .orderBy(tracks.position)
-      })
+      }) as Array<{ title: string; artist: string | null; position: number; featurings: string[] }>
     }
-
-    const currentIndex = sessionRow.currentTrackIndex
-    const currentTrack = trackList[currentIndex] ?? null
-
-    this.currentTrackTitle = currentTrack?.title ?? ''
-    this.currentTrackArtist = currentTrack?.artist ?? null
 
     // 2. Connect to chat
     await this.connection.connect()
@@ -86,6 +98,47 @@ export class BotSession {
     this.publisher.on('error', (err: Error) => logger.error({ err: err.message }, 'Redis publisher error'))
     this.subscriber = new Redis(this.redisUrl)
     this.subscriber.on('error', (err: Error) => logger.error({ err: err.message }, 'Redis subscriber error'))
+
+    // 3b. Create RoundStateManager
+    this.roundState = new RoundStateManager(this.publisher, this.sessionId)
+
+    // Load gameConfigs for window duration
+    const [configRow] = await withTenantContext(this.tenantId, async (tx) => {
+      return tx.select().from(gameConfigs).where(eq(gameConfigs.sessionId, this.sessionId))
+    })
+    const config = (configRow?.config as Record<string, unknown>) ?? {}
+    this.windowDurationMs = typeof config.windowDurationMs === 'number' ? config.windowDurationMs : 3000
+
+    // Load malus terms from playlist
+    if (playlistId) {
+      const [playlist] = await withTenantContext(this.tenantId, async (tx) => {
+        return tx.select({ malusTerms: playlists.malusTerms }).from(playlists).where(eq(playlists.id, playlistId))
+      })
+      this.malusTerms = playlist?.malusTerms ?? []
+    }
+
+    // Load or generate shuffle order
+    let shuffleOrder = sessionRow.shuffleOrder as number[] | null
+    if (!shuffleOrder) {
+      shuffleOrder = await this.roundState.getShuffleOrder()
+    }
+    if (!shuffleOrder && this.trackList.length > 0) {
+      shuffleOrder = fisherYatesShuffle(this.trackList.length)
+      // Persist to both DB and Redis
+      await withTenantContext(this.tenantId, async (tx) => {
+        await tx.update(sessions).set({ shuffleOrder }).where(eq(sessions.id, this.sessionId))
+      })
+      await this.roundState.setShuffleOrder(shuffleOrder)
+    }
+    this.shuffleOrder = shuffleOrder
+
+    // Set current track using shuffle order
+    const currentIndex = sessionRow.currentTrackIndex
+    const shuffledIndex = this.shuffleOrder ? this.shuffleOrder[currentIndex] : currentIndex
+    const currentTrack = this.trackList[shuffledIndex ?? currentIndex] ?? null
+
+    this.currentTrackTitle = currentTrack?.title ?? ''
+    this.currentTrackArtist = currentTrack?.artist ?? null
 
     // 4. Register chat message handler
     this.connection.onMessage(async (_channel, username, displayName, text) => {
@@ -117,7 +170,14 @@ export class BotSession {
       gameType: sessionRow.gameType,
       ...(playlistId ? { playlistId } : {}),
     })
-    this.plugin.setCurrentTrack(this.currentTrackTitle, this.currentTrackArtist)
+    this.plugin.setCurrentTrack(this.currentTrackTitle, this.currentTrackArtist, {
+      featurings: currentTrack?.featurings ?? [],
+      malusTerms: this.malusTerms,
+      windowDurationMs: this.windowDurationMs,
+    })
+
+    // Init round state
+    await this.roundState.initRound(this.windowDurationMs)
 
     // 7. Publish initial overlay state
     await this.publishState('active', [])
@@ -133,6 +193,11 @@ export class BotSession {
     this.stopped = true
 
     logger.info({ sessionId: this.sessionId }, 'BotSession stopping')
+
+    // Clean up round state
+    if (this.roundState) {
+      await this.roundState.cleanup().catch(() => {})
+    }
 
     // Remove bot status key (session is intentionally ending)
     if (this.publisher) {
@@ -179,7 +244,36 @@ export class BotSession {
         }
       )
 
+      // Track participation for streak
+      this.allParticipantsThisRound.add(username)
+
       if (!scoringEvent) return
+
+      // Apply streak multiplier (title/artist/double_shot only, not featuring or malus)
+      let finalPoints = scoringEvent.points
+      if (scoringEvent.reason !== 'featuring' && scoringEvent.reason !== 'malus' && scoringEvent.points > 0) {
+        const streak = await this.roundState!.getStreak(username)
+        const multiplier = 1 + streak * 0.1
+        finalPoints = Math.round(scoringEvent.points * multiplier * 10) / 10
+        scoringEvent.streakMultiplier = multiplier
+      }
+
+      // For malus: reset streak
+      if (scoringEvent.reason === 'malus') {
+        await this.roundState!.resetStreak(username)
+      }
+
+      // Track this viewer as having scored this round (for streak continuation)
+      if (scoringEvent.points > 0) {
+        const roundState = await this.roundState!.getRoundState()
+        if (roundState && !roundState.foundThisRound.includes(username)) {
+          roundState.foundThisRound.push(username)
+          await this.roundState!.updateRoundState(roundState)
+        }
+      }
+
+      // Update event with final points
+      scoringEvent.points = finalPoints
 
       // Upsert score in DB
       await this.upsertScore(scoringEvent)
@@ -237,6 +331,18 @@ export class BotSession {
 
     const newIndex = sessionRow.currentTrackIndex + 1
 
+    // Process streaks at round end before moving to next track
+    if (this.roundState) {
+      const roundState = await this.roundState.getRoundState()
+      if (roundState) {
+        await this.roundState.processStreaksAtRoundEnd(
+          roundState.foundThisRound,
+          Array.from(this.allParticipantsThisRound)
+        )
+      }
+      this.allParticipantsThisRound = new Set()
+    }
+
     await withTenantContext(this.tenantId, async (tx) => {
       await tx
         .update(sessions)
@@ -244,22 +350,19 @@ export class BotSession {
         .where(eq(sessions.id, this.sessionId))
     })
 
-    // Load next track
-    if (sessionRow.playlistId) {
-      const trackList = await withTenantContext(this.tenantId, async (tx) => {
-        return tx
-          .select({ title: tracks.title, artist: tracks.artist, position: tracks.position })
-          .from(tracks)
-          .where(eq(tracks.playlistId, sessionRow.playlistId!))
-          .orderBy(tracks.position)
-      })
+    // Load next track using shuffle order
+    const shuffledIndex = this.shuffleOrder ? this.shuffleOrder[newIndex] : newIndex
+    const nextTrack = this.trackList[shuffledIndex ?? newIndex] ?? null
+    this.currentTrackTitle = nextTrack?.title ?? ''
+    this.currentTrackArtist = nextTrack?.artist ?? null
 
-      const nextTrack = trackList[newIndex] ?? null
-      this.currentTrackTitle = nextTrack?.title ?? ''
-      this.currentTrackArtist = nextTrack?.artist ?? null
-    }
+    this.plugin.setCurrentTrack(this.currentTrackTitle, this.currentTrackArtist, {
+      featurings: nextTrack?.featurings ?? [],
+      malusTerms: this.malusTerms,
+      windowDurationMs: this.windowDurationMs,
+    })
+    await this.roundState?.initRound(this.windowDurationMs)
 
-    this.plugin.setCurrentTrack(this.currentTrackTitle, this.currentTrackArtist)
     await this.plugin.onReveal({
       sessionId: this.sessionId,
       tenantId: this.tenantId,
@@ -317,33 +420,28 @@ export class BotSession {
   }
 
   private async upsertScore(event: ScoringEvent): Promise<void> {
+    const streak = await this.roundState?.getStreak(event.viewerUsername) ?? 0
     await withTenantContext(this.tenantId, async (tx) => {
-      const [existing] = await tx
-        .select()
-        .from(sessionScores)
-        .where(eq(sessionScores.sessionId, this.sessionId))
-        .then((rows) => rows.filter((r) => r.viewerUsername === event.viewerUsername))
-
-      if (existing) {
-        await tx
-          .update(sessionScores)
-          .set({
-            score: existing.score + event.points,
-            correctAnswers: existing.correctAnswers + 1,
-            updatedAt: new Date(),
-          })
-          .where(eq(sessionScores.id, existing.id))
-      } else {
-        await tx.insert(sessionScores).values({
-          sessionId: this.sessionId,
-          tenantId: this.tenantId,
-          viewerUsername: event.viewerUsername,
-          viewerDisplayName: event.viewerDisplayName,
-          gameType: 'blindtest',
-          score: event.points,
-          correctAnswers: 1,
-        })
-      }
+      await tx.insert(sessionScores).values({
+        sessionId: this.sessionId,
+        tenantId: this.tenantId,
+        viewerUsername: event.viewerUsername,
+        viewerDisplayName: event.viewerDisplayName,
+        gameType: 'blindtest',
+        score: String(event.points),
+        streak,
+        correctAnswers: event.points > 0 ? 1 : 0,
+      }).onConflictDoUpdate({
+        target: [sessionScores.sessionId, sessionScores.viewerUsername],
+        set: {
+          score: sql`${sessionScores.score} + ${String(event.points)}`,
+          correctAnswers: event.points > 0
+            ? sql`${sessionScores.correctAnswers} + 1`
+            : sessionScores.correctAnswers,
+          streak,
+          updatedAt: new Date(),
+        },
+      })
     })
   }
 
@@ -364,7 +462,7 @@ export class BotSession {
     return scores.map((s) => ({
       username: s.viewerUsername,
       displayName: s.viewerDisplayName,
-      score: s.score,
+      score: typeof s.score === 'string' ? parseFloat(s.score) : s.score,
     }))
   }
 

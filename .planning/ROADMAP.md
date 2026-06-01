@@ -4,6 +4,7 @@
 
 - ✅ **v1.0 Foundation** - Phases 1-5 (shipped 2026-03)
 - 🚧 **v2.0 Funnier and Prettier Blindtest** - Phases 6-12 (in progress)
+- 📋 **v3.0 Battle Mode** - TBD (after v2)
 
 ## Phases
 
@@ -38,7 +39,7 @@
 
 ## Phase Details
 
-### Phase 6: Game Engine Foundation
+### Phase 6: Game Engine Foundation ✅
 **Goal**: The game engine delivers all v2 scoring mechanics with correct DB schema and atomic writes — every other phase depends on this.
 **Depends on**: Phase 5 (v1 complete)
 **Requirements**: GAME-01, GAME-02, GAME-03, GAME-04, GAME-05, GAME-06, GAME-07, GAME-08
@@ -49,11 +50,6 @@
   4. A viewer who submits title and artist in one message receives bonus points if both are correct, and zero points for both if only one is correct.
   5. Concurrent correct guesses from multiple viewers never produce lost score increments (atomic DB upsert in place).
 **Plans:** 4/4 plans complete
-Plans:
-- [ ] 06-01-PLAN.md — DB schema migration + type contracts + test stubs
-- [ ] 06-02-PLAN.md — BlindtestPlugin v2 (timing window, malus, double-shot, featurings) [TDD]
-- [ ] 06-03-PLAN.md — Fisher-Yates shuffle + configurable window duration
-- [ ] 06-04-PLAN.md — BotSession v2 (streak multiplier, atomic upsert, Redis round state)
 
 ### Phase 7: Spotify Import Cleanup
 **Goal**: Spotify track data is automatically cleaned on import, and streamers can manually correct titles, artists, and featurings before a session.
@@ -76,18 +72,7 @@ Plans:
   4. During a high-activity round with many simultaneous correct guesses, the bot never sends more than 15 messages in any 30-second window, and excess messages are silently dropped rather than delayed.
 **Plans**: TBD
 
-### Phase 9: Overlay Zone Redesign
-**Goal**: The OBS overlay exposes three independent zone URLs (player, feed, leaderboard), each updatable in real time from the same SSE stream, with no breakage to existing overlays already configured by streamers.
-**Depends on**: Phase 6 (typed overlay event contract), Phase 8 (bot events flowing into overlay feed)
-**Requirements**: OVRL-01, OVRL-02, OVRL-03, OVRL-04, OVRL-05, OVRL-06
-**Success Criteria** (what must be TRUE):
-  1. A streamer can add `/overlay/[token]/player` as an OBS browser source and see cover art that is blurred until the track is found.
-  2. A streamer can add `/overlay/[token]/feed` as a separate OBS source and see a live stream of who scored, malus hits, and streak milestones.
-  3. A streamer can add `/overlay/[token]/leaderboard` and see a leaderboard that updates in real time as scores change.
-  4. A streamer already using the full `/overlay/[token]` URL before v2 sees no visual breakage or missing events after the upgrade.
-**Plans**: TBD
-
-### Phase 10: Dashboard Live Controls
+### Phase 9: Dashboard Live Controls
 **Goal**: The streamer can correct track metadata and control round flow from the session dashboard while live, without race conditions on in-progress rounds.
 **Depends on**: Phase 6 (malus_terms DB column), Phase 8 (BotSession command routing)
 **Requirements**: DASH-01, DASH-02, DASH-03, DASH-04
@@ -96,6 +81,17 @@ Plans:
   2. Streamer can click +1 or -1 next to any viewer's score and the overlay leaderboard updates immediately.
   3. Streamer can click "Reveal" to expose all un-guessed answers and lock the current round for scoring.
   4. Between rounds, the dashboard displays a mini podium showing the top 3 viewers by points earned on the just-completed round.
+**Plans**: TBD
+
+### Phase 10: Overlay Zone Redesign
+**Goal**: The OBS overlay exposes three independent zone URLs (player, feed, leaderboard), each updatable in real time from the same SSE stream, with no breakage to existing overlays already configured by streamers.
+**Depends on**: Phase 6 (typed overlay event contract), Phase 8 (bot events flowing into overlay feed)
+**Requirements**: OVRL-01, OVRL-02, OVRL-03, OVRL-04, OVRL-05, OVRL-06
+**Success Criteria** (what must be TRUE):
+  1. A streamer can add `/overlay/[token]/player` as an OBS browser source and see cover art that is blurred until the track is found.
+  2. A streamer can add `/overlay/[token]/feed` as a separate OBS source and see a live stream of who scored, malus hits, and streak milestones.
+  3. A streamer can add `/overlay/[token]/leaderboard` and see a leaderboard that updates in real time as scores change.
+  4. A streamer already using the full `/overlay/[token]` URL before v2 sees no visual breakage or missing events after the upgrade.
 **Plans**: TBD
 
 ### Phase 11: Score Management
@@ -111,7 +107,7 @@ Plans:
 
 ### Phase 12: Streamer Guide
 **Goal**: A dedicated guide page in the dashboard gives streamers a complete reference for setup, scoring rules, and OBS overlay configuration.
-**Depends on**: Phase 9 (overlay zone URLs finalized), Phase 10 (live controls finalized), Phase 11 (export finalized)
+**Depends on**: Phase 10 (overlay zone URLs finalized), Phase 9 (live controls finalized), Phase 11 (export finalized)
 **Requirements**: GUIDE-01, GUIDE-02, GUIDE-03
 **Success Criteria** (what must be TRUE):
   1. A new streamer landing on the guide page can follow the setup steps — connect bot, create playlist, configure session, go live — without needing external documentation.
@@ -119,10 +115,27 @@ Plans:
   3. The guide page shows the three overlay zone URLs and explains how to add each as an OBS browser source.
 **Plans**: TBD
 
+### 📋 v3.0 Battle Mode (After v2)
+
+**Milestone Goal:** Add a second game mode — music tournament bracket where the community submits songs and votes head-to-head via Twitch chat, with an epic tug-of-war overlay.
+
+**Key features:**
+- Song submission via dedicated web page (multi-source: Spotify, YouTube, SoundCloud, Apple Music, Suno)
+- Bracket tournament elimination format
+- Chat voting with intelligent sanitization (not just exact "1" or "2")
+- Changeable votes during polling period
+- Visual feedback: +/- username pops toward vote bar
+- Tug-of-war style dual bar overlay (epic tension)
+- Timer-limited voting rounds
+- Room system: streamer + mods as admins, community chooses theme
+
+**Phases**: TBD — to be planned after v2 completion
+
 ## Progress
 
-**Execution Order:**
-Phases execute in numeric order: 6 → 7 → 8 → 9 → 10 → 11 → 12
+**v2 Execution Order (revised 2026-06-01):**
+Phases 7 → 8 → 9 → 10 → 11 → 12
+(Dashboard controls moved before overlay redesign — streamer control is more critical than visuals)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -131,10 +144,10 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10 → 11 → 12
 | 3. Spotify Integration | v1.0 | - | Complete | 2026-03 |
 | 4. Overlay SSE | v1.0 | - | Complete | 2026-03 |
 | 5. Admin and Moderation | v1.0 | - | Complete | 2026-03 |
-| 6. Game Engine Foundation | 4/4 | Complete   | 2026-03-18 | - |
+| 6. Game Engine Foundation | v2.0 | 4/4 | Complete | 2026-03-18 |
 | 7. Spotify Import Cleanup | v2.0 | 0/? | Not started | - |
-| 8. Bot Auto-Messages and Chat Commands | v2.0 | 0/? | Not started | - |
-| 9. Overlay Zone Redesign | v2.0 | 0/? | Not started | - |
-| 10. Dashboard Live Controls | v2.0 | 0/? | Not started | - |
+| 8. Bot Auto-Messages + Chat Commands | v2.0 | 0/? | Not started | - |
+| 9. Dashboard Live Controls | v2.0 | 0/? | Not started | - |
+| 10. Overlay Zone Redesign | v2.0 | 0/? | Not started | - |
 | 11. Score Management | v2.0 | 0/? | Not started | - |
 | 12. Streamer Guide | v2.0 | 0/? | Not started | - |

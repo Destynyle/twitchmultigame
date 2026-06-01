@@ -13,6 +13,7 @@ const mockSessionRow = {
   status: 'active' as const,
   isTestMode: 'true',
   currentTrackIndex: 0,
+  shuffleOrder: [0, 1],
   startedAt: null,
   endedAt: null,
   createdAt: new Date(),
@@ -69,7 +70,9 @@ const queryState = {
 const mockTx = {
   select: vi.fn(() => makeChainableQuery(queryState.nextResult())),
   insert: vi.fn(() => ({
-    values: vi.fn(() => Promise.resolve()),
+    values: vi.fn(() => ({
+      onConflictDoUpdate: vi.fn(() => Promise.resolve()),
+    })),
   })),
   update: vi.fn(() => ({
     set: vi.fn(() => ({
@@ -94,6 +97,8 @@ vi.mock('ioredis', () => ({
         sharedState.publishedMessages.push({ channel, message })
         return 1
       }),
+      set: vi.fn(async () => 'OK'),
+      get: vi.fn(async () => null),
       setex: vi.fn(async () => 'OK'),
       del: vi.fn(async () => 1),
       subscribe: vi.fn(async () => {}),
@@ -117,7 +122,7 @@ function setupTx(...results: unknown[]) {
   queryState.reset(...results)
 
   mockTx.select.mockImplementation(() => makeChainableQuery(queryState.nextResult()))
-  mockTx.insert.mockReturnValue({ values: vi.fn(() => Promise.resolve()) })
+  mockTx.insert.mockReturnValue({ values: vi.fn(() => ({ onConflictDoUpdate: vi.fn(() => Promise.resolve()) })) })
   mockTx.update.mockReturnValue({
     set: vi.fn(() => ({ where: vi.fn(() => Promise.resolve()) })),
   })
@@ -157,7 +162,7 @@ describe('BotSession', () => {
   })
 
   it('starts and publishes initial state', async () => {
-    setupTx([mockSessionRow], mockTracks)
+    setupTx([mockSessionRow], mockTracks, [], [{ malusTerms: [] }])
 
     const { session } = createBotSession()
     await session.start()
@@ -181,17 +186,17 @@ describe('BotSession', () => {
   })
 
   it('onChatMessage triggers a scoring event when correct answer given', async () => {
-    // start(): session, tracks
+    // start(): session, tracks, gameConfigs, malusTerms
     // upsertScore: existing scores [] → insert path
     // getLeaderboard: []
-    setupTx([mockSessionRow], mockTracks, [], [])
+    setupTx([mockSessionRow], mockTracks, [], [{ malusTerms: [] }], [], [])
 
     const { session, connection } = createBotSession()
     await session.start()
 
     sharedState.publishedMessages.length = 0
 
-    connection.simulateMessage('testchannel', 'viewer1', 'Viewer One', 'Queen')
+    connection.simulateMessage('testchannel', 'viewer1', 'Viewer One', 'Bohemian Rhapsody Queen')
 
     await new Promise((resolve) => setTimeout(resolve, 50))
 
@@ -214,9 +219,9 @@ describe('BotSession', () => {
   })
 
   it('handles next command and loads next track', async () => {
-    // start(): session, tracks
+    // start(): session, tracks, gameConfigs, malusTerms
     // handleNext(): session for index, tracks for new track, leaderboard
-    setupTx([mockSessionRow], mockTracks, [mockSessionRow], mockTracks, [])
+    setupTx([mockSessionRow], mockTracks, [], [{ malusTerms: [] }], [mockSessionRow], mockTracks, [])
 
     const { session } = createBotSession()
     await session.start()
@@ -238,9 +243,9 @@ describe('BotSession', () => {
 
   it('handles end command and stops the session', async () => {
     const endedSession = { ...mockSessionRow, status: 'ended' as const }
-    // start(): session, tracks
+    // start(): session, tracks, gameConfigs, malusTerms
     // handleEnd(): re-fetch session after update
-    setupTx([mockSessionRow], mockTracks, [endedSession])
+    setupTx([mockSessionRow], mockTracks, [], [{ malusTerms: [] }], [endedSession])
 
     const { session } = createBotSession()
     await session.start()
@@ -259,8 +264,8 @@ describe('BotSession', () => {
   })
 
   it('publishes system/reconnected event and processes queued messages after reconnect', async () => {
-    // start(): session + tracks; upsertScore insert path: []; getLeaderboard: []
-    setupTx([mockSessionRow], mockTracks, [], [])
+    // start(): session, tracks, gameConfigs, malusTerms; upsertScore: []; getLeaderboard: []
+    setupTx([mockSessionRow], mockTracks, [], [{ malusTerms: [] }], [], [])
 
     const { session, connection } = createBotSession()
     await session.start()
@@ -269,7 +274,7 @@ describe('BotSession', () => {
 
     // Simulate drop — messages arriving during reconnect window must be queued
     connection.simulateDisconnect()
-    connection.simulateMessage('testchannel', 'viewer1', 'Viewer1', 'Queen')
+    connection.simulateMessage('testchannel', 'viewer1', 'Viewer1', 'Bohemian Rhapsody Queen')
 
     // Nothing processed yet
     expect(sharedState.publishedMessages.filter((m) => {

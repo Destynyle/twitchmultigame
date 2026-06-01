@@ -44,8 +44,8 @@ export class TwitchChatConnection implements IChatConnection {
       channels: [twitchLogin],
     })
 
-    this.client.on('message', (_channel, tags, message, self) => {
-      if (self) return
+    this.client.on('message', (_channel, tags, message, _self) => {
+      logger.info({ channel: _channel, user: tags.username, text: message }, 'RAW tmi.js message received')
       const username = tags.username ?? tags['display-name'] ?? 'unknown'
       const displayName = tags['display-name'] ?? username
 

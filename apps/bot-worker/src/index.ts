@@ -10,7 +10,7 @@ void runner.start()
 
 // Render Web Service requires a bound port — serve a minimal health endpoint
 const port = process.env['PORT'] ? parseInt(process.env['PORT']) : 10000
-createServer((req, res) => {
+createServer((_req, res) => {
   res.writeHead(200)
   res.end('ok')
 }).listen(port, () => {

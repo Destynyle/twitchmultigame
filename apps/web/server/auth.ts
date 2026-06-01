@@ -10,6 +10,7 @@ import { authConfig } from './auth.config'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  debug: true,
   secret: env.AUTH_SECRET,
   session: { strategy: 'jwt' },
   providers: [

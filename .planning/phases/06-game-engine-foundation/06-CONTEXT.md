@@ -86,7 +86,7 @@ Deliver the complete v2 gameplay engine in `packages/game-engine` and `packages/
 
 ### DB schema
 - `packages/db/src/schema/sessions.ts` — `sessionScores`, `gameConfigs`, `sessions` tables; new columns needed for streak, decimals, featurings
-- `packages/db/migrations/` — Current migration state (0011); next migration is 0012
+- `packages/db/migrations/` — Current migration state (0012); next migration is 0013
 
 ### Requirements (all Phase 6)
 - `.planning/REQUIREMENTS.md` — GAME-01 through GAME-08 (full acceptance criteria)

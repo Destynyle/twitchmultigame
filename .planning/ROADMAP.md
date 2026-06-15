@@ -1,153 +1,169 @@
-# Roadmap: Playground — Twitch Blindtest Platform
+# Roadmap: Playground — Static Twitch Blindtest
+
+## Architecture Pivot (2026-06-14)
+
+v2 pivots from a multi-tenant SaaS backend to a **zero-backend static client app**.
+Rationale: the only thing forcing OAuth + server was the bot *speaking* in chat. Dropping
+the talking bot (replaced by rich overlay animations) collapses the whole backend. Anonymous
+Twitch IRC (`justinfan`) reads chat token-free in the browser; scoring is deterministic and
+runs client-side; the pure `packages/game-engine` (zero Redis/DB coupling) is lifted as-is.
+
+**Result:** a static web app any streamer opens, types their channel name, loads a playlist,
+and plays — no signup, no token, no deploy infra. Usable by everyone.
 
 ## Milestones
 
-- ✅ **v1.0 Foundation** - Phases 1-5 (shipped 2026-03)
-- 🚧 **v2.0 Funnier and Prettier Blindtest** - Phases 6-12 (in progress)
-- 📋 **v3.0 Battle Mode** - TBD (after v2)
+- ✅ **v1.0 Foundation** — Phases 1-5, SaaS backend (shipped 2026-03, **superseded by pivot**)
+- 🚧 **v2.0 Static Blindtest** — Phases 1-9 (greenfield static rewrite, in progress)
+- 📋 **v3.0 Battle Mode** — TBD (after v2)
 
-## Phases
+## What carries over
 
-<details>
-<summary>✅ v1.0 Foundation (Phases 1-5) - SHIPPED 2026-03</summary>
+- `packages/game-engine` (fuzzy-matcher, normalizer, scorer, shuffle, plugins) — **reused as-is**, zero backend coupling
+- `packages/game-types` — reused
+- v2 gameplay design (window scoring, streak, malus, double-shot) — already built & tested in old Phase 06
+- Feature *content* of old phases 7/9/10/11/12 (Spotify cleanup, live controls, overlay zones, export, guide) — re-homed client-side
 
-### Phase 1: Twitch OAuth + Tenant Creation
-**Goal**: Users can securely log in with Twitch and get a tenant account on first login.
-**Plans**: Complete
+## What dies in the pivot
 
-### Phase 2: Session Management
-**Goal**: Streamers can create, manage, and delete blindtest sessions with bot lifecycle.
-**Plans**: Complete
+- OAuth Twitch + AES token encryption
+- PostgreSQL + RLS + multi-tenant
+- Redis pub/sub + SSE
+- `apps/bot-worker` (separate Node process)
+- Old Phase 8 (bot auto-messages + chat commands) — **replaced by overlay animations**; the talking bot is gone, `!score`/`!rank` unneeded because the leaderboard is always on screen
 
-### Phase 3: Spotify Integration
-**Goal**: Streamers can import Spotify playlists as track lists and manage tracks.
-**Plans**: Complete
+## Tech decisions (locked 2026-06-14)
 
-### Phase 4: Overlay SSE
-**Goal**: The OBS overlay displays live scores, leaderboard, and themes via SSE.
-**Plans**: Complete
+| Decision | Choice |
+|----------|--------|
+| Frontend | Vite + React SPA (static export) |
+| OBS ↔ control sync | `BroadcastChannel` (same-PC tabs, zero server) |
+| Music source | YouTube IFrame + Spotify embed (multi-source) |
+| Config/scores storage | 100% client (localStorage + JSON import/export) |
+| Old backend code | Repart clean — keep `game-engine`/`game-types`, drop the rest |
 
-### Phase 5: Admin and Moderation
-**Goal**: Admins can monitor sessions, quarantine users, and moderate content.
-**Plans**: Complete
+---
 
-</details>
+## v2.0 Static Blindtest — Phase Details
 
-### 🚧 v2.0 Funnier and Prettier Blindtest (In Progress)
-
-**Milestone Goal:** Redesign the gameplay loop to be more engaging and competitive — fuzzy answer matching, streak/malus/double-shot scoring, active bot feedback, improved overlay, and live dashboard controls.
-
-## Phase Details
-
-### Phase 6: Game Engine Foundation ✅
-**Goal**: The game engine delivers all v2 scoring mechanics with correct DB schema and atomic writes — every other phase depends on this.
-**Depends on**: Phase 5 (v1 complete)
-**Requirements**: GAME-01, GAME-02, GAME-03, GAME-04, GAME-05, GAME-06, GAME-07, GAME-08
-**Success Criteria** (what must be TRUE):
-  1. A viewer who guesses correctly within 3 seconds of the first finder receives proportionally fewer points than the first finder.
-  2. A viewer's streak multiplier increases across consecutive found rounds and resets when they miss or trigger a malus.
-  3. A viewer who types a malus trap term loses points; the trap terms are configured per playlist by the streamer.
-  4. A viewer who submits title and artist in one message receives bonus points if both are correct, and zero points for both if only one is correct.
-  5. Concurrent correct guesses from multiple viewers never produce lost score increments (atomic DB upsert in place).
-**Plans:** 4/4 plans complete
-
-### Phase 7: Spotify Import Cleanup
-**Goal**: Spotify track data is automatically cleaned on import, and streamers can manually correct titles, artists, and featurings before a session.
-**Depends on**: Phase 6 (DB schema for featurings column)
-**Requirements**: SPOT-01, SPOT-02, SPOT-03
-**Success Criteria** (what must be TRUE):
-  1. A freshly imported Spotify track with "(Radio Edit)" or "(Remastered)" in the title shows the cleaned title automatically.
-  2. A track imported with "(feat. X)" in the title stores the featuring separately and shows a clean title without the annotation.
-  3. Streamer can edit the cleaned title, artist, and featurings of any track in the playlist list before starting a session.
+### Phase 1: Scaffold + Engine Lift
+**Goal**: A Vite + React SPA builds and runs, with the reused game-engine importable and the old SaaS backend removed from the active build.
+**Depends on**: none (greenfield)
+**Requirements**: CORE-01, CORE-02
+**Success Criteria**:
+  1. `npm run dev` serves a Vite SPA that renders a placeholder app shell.
+  2. `packages/game-engine` scoring functions import and run inside the SPA (a smoke call returns a score).
+  3. The old `apps/web` backend routes, `apps/bot-worker`, `packages/db` are no longer part of the build graph.
 **Plans**: TBD
 
-### Phase 8: Bot Auto-Messages and Chat Commands
-**Goal**: The bot actively participates in chat — confirming finds, announcing milestones, and responding to viewer commands — without ever tripping Twitch rate limits.
-**Depends on**: Phase 6 (game engine events), Phase 7 (featurings data)
-**Requirements**: BOT-01, BOT-02, BOT-03, BOT-04, BOT-05, BOT-06, BOT-07, BOT-08, BOT-09, BOT-10, BOT-11, BOT-12
-**Success Criteria** (what must be TRUE):
-  1. When a new round starts, the bot sends a chat message announcing that guessing is open.
-  2. When a viewer correctly guesses the title or artist, the bot confirms it in chat within the same second.
-  3. A viewer typing `!score`, `!rank`, `!streak`, `!rules`, or `!pointexplain` in chat receives an accurate response from the bot.
-  4. During a high-activity round with many simultaneous correct guesses, the bot never sends more than 15 messages in any 30-second window, and excess messages are silently dropped rather than delayed.
+### Phase 2: Anonymous Twitch Chat Reader
+**Goal**: The app connects to Twitch chat read-only with no token and emits a clean stream of parsed messages.
+**Depends on**: Phase 1
+**Requirements**: CHAT-01, CHAT-02, CHAT-03
+**Success Criteria**:
+  1. Entering a channel name connects via anonymous `justinfan` over WSS with no credentials.
+  2. Each chat message surfaces as `{ user, message, timestamp }` to the app.
+  3. A dropped socket auto-reconnects without user action and resumes message flow.
 **Plans**: TBD
 
-### Phase 9: Dashboard Live Controls
-**Goal**: The streamer can correct track metadata and control round flow from the session dashboard while live, without race conditions on in-progress rounds.
-**Depends on**: Phase 6 (malus_terms DB column), Phase 8 (BotSession command routing)
-**Requirements**: DASH-01, DASH-02, DASH-03, DASH-04
-**Success Criteria** (what must be TRUE):
-  1. Streamer can edit the title, artist, featurings, and malus terms of the currently playing track from the dashboard, with changes taking effect at the next round boundary.
-  2. Streamer can click +1 or -1 next to any viewer's score and the overlay leaderboard updates immediately.
-  3. Streamer can click "Reveal" to expose all un-guessed answers and lock the current round for scoring.
-  4. Between rounds, the dashboard displays a mini podium showing the top 3 viewers by points earned on the just-completed round.
+### Phase 3: Playlists & Config (Client-Side)
+**Goal**: A streamer builds and edits a playlist of tracks — title, artist, featurings, malus terms, and a music source binding — stored entirely client-side and shareable as a file.
+**Depends on**: Phase 1
+**Requirements**: CFG-01, CFG-02, CFG-03, CFG-04
+**Success Criteria**:
+  1. Streamer can create a track with title, artist, featurings, malus terms, and a YouTube or Spotify source.
+  2. Playlists persist in localStorage across reloads.
+  3. Streamer can export a playlist to a JSON file and re-import it on another machine.
+  4. Pasting a YouTube/Spotify URL auto-extracts available metadata (title/artist) into the form.
 **Plans**: TBD
 
-### Phase 10: Overlay Zone Redesign
-**Goal**: The OBS overlay exposes three independent zone URLs (player, feed, leaderboard), each updatable in real time from the same SSE stream, with no breakage to existing overlays already configured by streamers.
-**Depends on**: Phase 6 (typed overlay event contract), Phase 8 (bot events flowing into overlay feed)
-**Requirements**: OVRL-01, OVRL-02, OVRL-03, OVRL-04, OVRL-05, OVRL-06
-**Success Criteria** (what must be TRUE):
-  1. A streamer can add `/overlay/[token]/player` as an OBS browser source and see cover art that is blurred until the track is found.
-  2. A streamer can add `/overlay/[token]/feed` as a separate OBS source and see a live stream of who scored, malus hits, and streak milestones.
-  3. A streamer can add `/overlay/[token]/leaderboard` and see a leaderboard that updates in real time as scores change.
-  4. A streamer already using the full `/overlay/[token]` URL before v2 sees no visual breakage or missing events after the upgrade.
+### Phase 4: Music Player Abstraction
+**Goal**: A unified player drives playback for both YouTube and Spotify sources with consistent play/pause/seek controls per round.
+**Depends on**: Phase 3
+**Requirements**: PLAY-01, PLAY-02, PLAY-03
+**Success Criteria**:
+  1. A YouTube-sourced track plays in-app via the IFrame API with programmatic play/pause/seek.
+  2. A Spotify-sourced track plays via embed (within embed limits) through the same player interface.
+  3. The game loop can start playback at round start and stop it at reveal regardless of source.
 **Plans**: TBD
 
-### Phase 11: Score Management
-**Goal**: Streamers can export session scores in multiple formats and import a previous session's scores to resume from a saved state.
-**Depends on**: Phase 6 (DB schema for scores with streak column)
-**Requirements**: SCORE-01, SCORE-02, SCORE-03, SCORE-04
-**Success Criteria** (what must be TRUE):
-  1. Streamer can download a JSON file of all session scores that includes viewer names, total points, and streak at end of session.
-  2. Streamer can download a CSV file of scores that opens correctly in Excel or Google Sheets.
-  3. Streamer can upload a previously exported score file to a new session and see the imported scores reflected in the leaderboard.
-  4. Streamer can export a PNG image of the final podium showing the top 3 viewers with names and scores.
+### Phase 5: Game Loop (In-Memory State)
+**Goal**: Chat messages flow through the engine into an in-memory round state machine producing live scores, streaks, malus, and double-shot — replacing the old Redis RoundStateManager.
+**Depends on**: Phase 2, Phase 4
+**Requirements**: LOOP-01, LOOP-02, LOOP-03, LOOP-04, LOOP-05
+**Success Criteria**:
+  1. Starting a round opens a guessing window; chat guesses are matched by the engine and scored.
+  2. First finder gets max points; finders within the window get proportionally fewer (window scoring works client-side).
+  3. Streak multiplier accumulates across found rounds and resets on miss/malus, per viewer, held in memory.
+  4. A malus trap term deducts points and a double-shot (title+artist) is all-or-nothing — both fully wired.
+  5. Reveal locks the round and advances to the next track; round state survives a control-tab reload (rehydrate from localStorage).
 **Plans**: TBD
 
-### Phase 12: Streamer Guide
-**Goal**: A dedicated guide page in the dashboard gives streamers a complete reference for setup, scoring rules, and OBS overlay configuration.
-**Depends on**: Phase 10 (overlay zone URLs finalized), Phase 9 (live controls finalized), Phase 11 (export finalized)
+### Phase 6: Control Panel
+**Goal**: The operator drives the entire game from one panel — start/reveal/next, live metadata edits, manual score adjustments, and a between-rounds mini podium.
+**Depends on**: Phase 5
+**Requirements**: CTRL-01, CTRL-02, CTRL-03, CTRL-04
+**Success Criteria**:
+  1. Operator can start a round, reveal answers, and advance to the next track from the panel.
+  2. Operator can edit the current track's title/artist/featurings/malus; edits apply at the next round boundary.
+  3. Operator can +1/-1 any viewer's score and the change is reflected immediately.
+  4. Between rounds the panel shows a mini podium of the top 3 by points earned that round.
+**Plans**: TBD
+
+### Phase 7: Overlay + BroadcastChannel Sync
+**Goal**: A separate overlay view (OBS browser source) mirrors live game state via BroadcastChannel and renders blurred cover, leaderboard, and an animated feed of finds/malus/streak — the visual replacement for the talking bot.
+**Depends on**: Phase 6
+**Requirements**: OVR-01, OVR-02, OVR-03, OVR-04
+**Success Criteria**:
+  1. The overlay opens as its own URL/tab and receives state from the control panel via BroadcastChannel with no server.
+  2. The cover art is blurred until the track is found, then sharpens.
+  3. A live feed animates events — "+X user found", "−X user malus", streak milestones — as pops.
+  4. The leaderboard updates in real time as scores change.
+**Plans**: TBD
+
+### Phase 8: Score Export
+**Goal**: The streamer exports final session results in multiple formats, all generated client-side.
+**Depends on**: Phase 6
+**Requirements**: EXP-01, EXP-02, EXP-03
+**Success Criteria**:
+  1. Streamer can download session scores as JSON (names, points, final streak).
+  2. Streamer can download a CSV that opens correctly in Excel/Sheets.
+  3. Streamer can export a PNG of the final podium (top 3 with names + scores).
+**Plans**: TBD
+
+### Phase 9: In-App Streamer Guide
+**Goal**: An in-app guide page lets a new streamer go from zero to live without external docs.
+**Depends on**: Phase 7, Phase 6, Phase 8
 **Requirements**: GUIDE-01, GUIDE-02, GUIDE-03
-**Success Criteria** (what must be TRUE):
-  1. A new streamer landing on the guide page can follow the setup steps — connect bot, create playlist, configure session, go live — without needing external documentation.
-  2. The guide page explains how points, streaks, malus, and double-shot work in plain language the streamer can read aloud to their chat.
-  3. The guide page shows the three overlay zone URLs and explains how to add each as an OBS browser source.
+**Success Criteria**:
+  1. A new streamer can follow the setup steps — enter channel, build playlist, add overlay to OBS, go live.
+  2. The guide explains points/streak/malus/double-shot in plain language.
+  3. The guide shows how to add the overlay URL as an OBS browser source.
 **Plans**: TBD
 
-### 📋 v3.0 Battle Mode (After v2)
+---
 
-**Milestone Goal:** Add a second game mode — music tournament bracket where the community submits songs and votes head-to-head via Twitch chat, with an epic tug-of-war overlay.
+## v3.0 Battle Mode (After v2)
 
-**Key features:**
-- Song submission via dedicated web page (multi-source: Spotify, YouTube, SoundCloud, Apple Music, Suno)
-- Bracket tournament elimination format
-- Chat voting with intelligent sanitization (not just exact "1" or "2")
-- Changeable votes during polling period
-- Visual feedback: +/- username pops toward vote bar
-- Tug-of-war style dual bar overlay (epic tension)
-- Timer-limited voting rounds
-- Room system: streamer + mods as admins, community chooses theme
-
-**Phases**: TBD — to be planned after v2 completion
+Music tournament bracket — community submits songs, head-to-head chat voting, tug-of-war
+overlay. Now inherits the static/zero-backend foundation. Phases TBD after v2.
 
 ## Progress
 
-**v2 Execution Order (revised 2026-06-01):**
-Phases 7 → 8 → 9 → 10 → 11 → 12
-(Dashboard controls moved before overlay redesign — streamer control is more critical than visuals)
+| Phase | Milestone | Status |
+|-------|-----------|--------|
+| 1. Scaffold + Engine Lift | v2.0 | ✅ Built (build+types green) |
+| 2. Anonymous Chat Reader | v2.0 | ✅ Built — ⚠️ needs live browser test |
+| 3. Playlists & Config | v2.0 | ✅ Built |
+| 4. Music Player | v2.0 | ✅ Built |
+| 5. Game Loop | v2.0 | ✅ Built (in-memory, streak reimplemented) |
+| 6. Control Panel | v2.0 | ✅ Built |
+| 7. Overlay + Sync | v2.0 | ✅ Built |
+| 8. Score Export | v2.0 | ✅ Built (JSON/CSV/PNG) |
+| 9. Streamer Guide | v2.0 | ✅ Built (/guide) |
 
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 1. Twitch OAuth + Tenant Creation | v1.0 | - | Complete | 2026-03 |
-| 2. Session Management | v1.0 | - | Complete | 2026-03 |
-| 3. Spotify Integration | v1.0 | - | Complete | 2026-03 |
-| 4. Overlay SSE | v1.0 | - | Complete | 2026-03 |
-| 5. Admin and Moderation | v1.0 | - | Complete | 2026-03 |
-| 6. Game Engine Foundation | v2.0 | 4/4 | Complete | 2026-03-18 |
-| 7. Spotify Import Cleanup | v2.0 | 0/? | Not started | - |
-| 8. Bot Auto-Messages + Chat Commands | v2.0 | 0/? | Not started | - |
-| 9. Dashboard Live Controls | v2.0 | 0/? | Not started | - |
-| 10. Overlay Zone Redesign | v2.0 | 0/? | Not started | - |
-| 11. Score Management | v2.0 | 0/? | Not started | - |
-| 12. Streamer Guide | v2.0 | 0/? | Not started | - |
+All 9 phases built as a vertical slice in `apps/app` on branch `feat/static-rewrite` (2026-06-14).
+Old SaaS back (apps/web, bot-worker, packages/db, shared) + deploy config removed.
+**Outstanding:** live end-to-end browser test, streak formula tuning, commit.
+
+*Roadmap rewritten 2026-06-14 — static-app pivot. Old SaaS v2 phases 6-12 superseded.*

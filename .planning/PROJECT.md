@@ -1,90 +1,103 @@
-# Playground — Twitch Blindtest Platform
+# Playground — Static Twitch Blindtest
 
 ## What This Is
 
-A multi-tenant SaaS platform where Twitch streamers host live music blindtest sessions directly in their chat. Viewers guess song titles and artists in real-time, scores appear on an OBS overlay, and the streamer controls everything from a dashboard. Built on a Turborepo monorepo (Next.js 15, Node.js bot worker, Drizzle/PostgreSQL, Redis).
+A **zero-backend static web app** for running live music blindtests on Twitch. A streamer opens
+the app, types their channel name, loads a playlist, and plays. The app reads chat anonymously
+(no token), scores guesses client-side, and drives an OBS overlay — no signup, no server, no
+deploy infra. Built as a Vite + React SPA reusing the pure `packages/game-engine` scoring logic.
 
 ## Core Value
 
-The streamer can run an engaging live blindtest on their Twitch stream with zero friction — chat guesses, bot reacts, overlay updates in real time.
+A streamer runs an engaging, competitive live blindtest with zero friction and zero setup cost —
+chat guesses, the screen reacts with animations, the leaderboard updates in real time — and
+anyone can use it without credentials.
 
-## Current Milestone: v2.0 Funnier and Prettier Blindtest
+## The Pivot (2026-06-14)
 
-**Goal:** Redesign the gameplay loop to be more engaging and competitive — fuzzy answer matching, streak/malus/double-shot scoring, active bot feedback, improved overlay, and live dashboard controls.
+Originally a multi-tenant SaaS (Next.js + Postgres/RLS + Redis + separate bot-worker, OAuth
+tokens). The only thing forcing all that backend was the bot *speaking* in chat (`chat:edit`
+needs OAuth). Dropping the talking bot — replaced by rich overlay animations — collapses the
+entire backend:
+
+- Anonymous Twitch IRC (`justinfan`) reads chat token-free in the browser.
+- Scoring is deterministic → runs client-side via the reused game-engine.
+- OBS ↔ control sync via `BroadcastChannel` (same-PC tabs) → no Redis/SSE.
+- Config + scores live in localStorage + JSON files → no database.
+
+`!score`/`!rank` chat commands become unnecessary because the leaderboard is always on screen.
+
+## Current Milestone: v2.0 Static Blindtest
+
+**Goal:** Rebuild the blindtest as a static client app — anonymous chat reading, client-side
+scoring, multi-source music player, control panel, animated overlay, and score export — usable
+by anyone with no account or token.
 
 **Target features:**
-- Advanced gameplay engine (fuzzy match, scoring window, streak, malus, double shot)
-- Redesigned overlay (3 separate zones: iPod player, round feed, leaderboard)
-- Active bot Twitch messages + chat commands (!score, !streak, !rank, !rules)
-- Live dashboard editing (title/artist/featurings/malus during play)
-- Score management (manual +1/-1, import/export JSON/CSV/image)
+- Anonymous Twitch chat reader (no token)
+- Client-side game loop (window scoring, streak, malus, double-shot) reusing game-engine
+- Playlists & config 100% client (localStorage + JSON import/export)
+- Multi-source music player (YouTube IFrame + Spotify embed)
+- Control panel (start/reveal/next, live edits, +/- score, mini podium)
+- Animated overlay (blurred cover, leaderboard, finds/malus/streak feed) synced via BroadcastChannel
+- Score export (JSON/CSV/PNG podium)
+- In-app streamer guide
 
 ## Requirements
 
-### Validated
+### Validated (gameplay built in old Phase 06, reused)
 
-<!-- Shipped in v1.0 — confirmed valuable -->
+- ✓ Fuzzy answer matching (Sørensen-Dice, malus tolerance 0.15)
+- ✓ Window scoring (first finder max, proportional decay)
+- ✓ Double-shot all-or-nothing
+- ✓ Streak multiplier (breaks on miss/malus)
+- ✓ Malus trap terms per playlist
 
-- ✓ User can log in with Twitch OAuth — Phase 1
-- ✓ Platform creates a tenant account on first login — Phase 1
-- ✓ User can connect/disconnect their Twitch bot — Phase 2
-- ✓ User can create, view, and delete sessions — Phase 2
-- ✓ User can import Spotify playlists as track lists — Phase 3
-- ✓ User can view and manage tracks in a playlist — Phase 3
-- ✓ Overlay displays scores and leaderboard via SSE — Phase 4
-- ✓ Overlay supports 3 visual themes — Phase 4
-- ✓ Admin can monitor sessions and trigger interventions — Phase 5
-- ✓ Admin can quarantine and moderate users and content — Phase 5
+### Active (v2.0 static scope)
 
-### Active
-
-<!-- Current v2.0 scope — building toward these -->
-
-- [ ] User can run a session with fuzzy answer matching
-- [ ] Viewer answers are scored with timing window (first finder gets max points)
-- [ ] Double-shot bonus for guessing title + artist in same message
-- [ ] Streak multiplier accumulates across consecutive found songs
-- [ ] Streamer can configure malus trap terms per playlist
-- [ ] Overlay redesigned with 3 independent zones (player, round feed, leaderboard)
-- [ ] Bot sends automatic messages on key events (find, malus, streak)
-- [ ] Viewers can query bot with !score, !streak, !rank, !rules
-- [ ] Streamer can edit title/artist/featurings/malus live during a round
-- [ ] Streamer can manually adjust viewer scores (+1/-1)
-- [ ] Session scores can be exported (JSON, CSV, image) and imported
+- [ ] App reads Twitch chat anonymously with no token
+- [ ] Game loop runs fully client-side (in-memory round state)
+- [ ] Playlists created/edited/persisted client-side + JSON import/export
+- [ ] Music plays from YouTube and Spotify through one player interface
+- [ ] Operator drives rounds from a control panel (live edits, manual score)
+- [ ] Overlay mirrors state via BroadcastChannel with animated feed
+- [ ] Scores export to JSON/CSV/PNG
+- [ ] In-app guide covers setup, rules, OBS overlay
 
 ### Out of Scope
 
-- Real-time chat DMs — not core to blindtest value
+- Any server-side backend (database, auth, bot process) — the whole point of the pivot
+- Bot speaking in chat — replaced by overlay animations
+- Multi-tenant accounts / login — anyone uses it directly
 - Mobile native app — web-first
-- Video posts / video overlay — out of scope v2
-- OAuth login providers other than Twitch — unnecessary for target audience
+- Spotify full-track playback requiring premium auth — stays within embed limits
 
 ## Context
 
-- Twitch is the primary distribution channel — all gameplay is chat-driven
-- Redis channels: `session:cmd:{sessionId}` (web→bot), `overlay:{tenantId}` (bot→SSE)
-- Bot worker is a separate Node.js CJS process communicating via Redis pub/sub
-- Existing overlay SSE at `/api/overlay/[token]` — will be extended for 3-zone support
-- Game engine lives in `packages/game-engine` — core gameplay logic lives there
-- Spotify import already exists — need to add title cleanup (strip remix/live/feat annotations)
-- Deployment: Render (web + bot-worker), PostgreSQL with RLS, Redis
+- Twitch chat is read anonymously via `wss://irc-ws.chat.twitch.tv` with a `justinfan` login
+- `packages/game-engine` (fuzzy-matcher, normalizer, scorer, shuffle, plugins) is pure — verified zero Redis/DB imports — and is lifted into the SPA as-is
+- `packages/game-types` reused
+- OBS browser source + control panel run on the streamer's same machine → BroadcastChannel suffices for sync
+- YouTube IFrame API is the unconstrained music path; Spotify embed is supported within its 30s/limit constraints
+- Old `apps/web` backend, `apps/bot-worker`, `packages/db` are dropped from the active build
 
 ## Constraints
 
-- **Tech stack**: Next.js 15 App Router + Node.js bot-worker — no major architecture change
-- **Bot**: Twitch account owned by streamer — only chat:read + chat:edit scopes available
-- **DB**: RLS enabled with Render non-superuser workaround (permissive INSERT policies)
-- **Overlay**: Must remain public URL (no auth) — SSE endpoint unchanged contract
+- **Tech stack**: Vite + React SPA, static export — no backend
+- **Sync**: BroadcastChannel — control + overlay must be same browser/machine
+- **Music**: Spotify limited to embed; YouTube full playback via IFrame API
+- **Storage**: client-only (localStorage + file import/export) — no persistence server
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Fuzzy matching: Sørensen-Dice bigrammes, seuil 0.8 | Tolerant of typos, common in French streams | Validated in Phase 06: tolerance tightened to 0.15 |
-| Fenêtre de grattage: 3s configurable | Gives latecomers a chance, prevents winner-takes-all | Validated in Phase 06: loaded from gameConfigs.config.windowDurationMs |
-| Double shot: lose ALL points if only one correct | Pure high-risk bonus, as designed | Validated in Phase 06: checkDoubleShot all-or-nothing, 8 passing tests |
-| Streak breaks on wrong answer (including malus) | Punishes spam-guessing behavior | Validated in Phase 06: processStreaksAtRoundEnd + RoundStateManager |
-| 3 overlay zones as separate URL paths | OBS browser source crop flexibility | — Pending |
+| Drop the talking bot | It was the sole driver of OAuth + backend | Pivot to zero-backend static app |
+| Vite + React SPA | Lightest for pure client, trivial static deploy | Locked 2026-06-14 |
+| BroadcastChannel for OBS↔control | Same-PC tabs, zero server | Locked 2026-06-14 |
+| YouTube + Spotify multi-source | YT unconstrained, Spotify familiar metadata | Locked 2026-06-14 |
+| 100% client config/scores | No DB needed for side-project scope | Locked 2026-06-14 |
+| Keep game-engine, drop rest | Scoring is pure & tested; backend is dead weight | Locked 2026-06-14 |
 
 ---
-*Last updated: 2026-03-18 — Phase 06 complete (game-engine-foundation)*
+*Last updated: 2026-06-14 — static-app pivot. Supersedes the SaaS architecture.*

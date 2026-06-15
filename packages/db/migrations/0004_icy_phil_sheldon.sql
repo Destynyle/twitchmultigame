@@ -1,1 +1,0 @@
-ALTER POLICY "users_tenant_isolation" ON "users" TO public USING ("users"."tenant_id" = current_setting('app.current_tenant_id', true)::uuid AND "users"."deleted_at" IS NULL);

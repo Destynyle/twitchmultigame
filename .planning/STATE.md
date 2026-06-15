@@ -1,90 +1,109 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.0
-milestone_name: Funnier and Prettier Blindtest
-status: unknown
-stopped_at: Completed 06-04-PLAN.md
-last_updated: "2026-03-18T18:36:13.211Z"
+milestone_name: Static Blindtest
+status: in_progress
+stopped_at: vertical slice built on branch feat/static-rewrite — needs live browser test (2026-06-14)
+last_updated: "2026-06-14T00:00:00.000Z"
 progress:
-  total_phases: 7
-  completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  total_phases: 9
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-17)
+See: .planning/PROJECT.md (updated 2026-06-14 — static-app pivot)
 
-**Core value:** The streamer can run an engaging live blindtest on their Twitch stream with zero friction — chat guesses, bot reacts, overlay updates in real time.
-**Current focus:** Phase 06 — game-engine-foundation
+**Core value:** A streamer opens a static web app, types their channel name, loads a playlist,
+and runs an engaging live blindtest on Twitch — zero signup, zero token, zero backend.
+**Current focus:** Phase 01 — Scaffold + Engine Lift (Vite SPA, reuse game-engine)
 
 ## Current Position
 
-Phase: 06 (game-engine-foundation) — COMPLETE
-Plan: 4 of 4
+Branch: `feat/static-rewrite` (NOT committed yet — user hasn't asked)
+Built a working vertical slice covering most of phases 1-8 in `apps/app` (Vite+React SPA):
 
-## Performance Metrics
+- **Ph1 Scaffold** ✅ — `apps/app` Vite+React+Tailwind v4, imports game-engine/game-types (build + type-check green)
+- **Ph2 Chat reader** ✅ — `src/lib/twitch-chat.ts` anonymous justinfan WSS + reconnect (needs live browser test)
+- **Ph3 Playlists** ✅ — `src/pages/Setup.tsx` + `storage.ts` + `sources.ts` (URL parse + oEmbed meta), localStorage + JSON import/export
+- **Ph4 Player** ✅ — `src/components/Player.tsx` YouTube IFrame API + Spotify embed
+- **Ph5 Game loop** ✅ — `src/game/controller.ts` wraps BlindtestPlugin + in-memory streak/scores/feed (replaces Redis RoundStateManager)
+- **Ph6 Control panel** ✅ — `src/pages/Control.tsx` start/reveal/next, +/- score, mini podium
+- **Ph7 Overlay+sync** ✅ — `src/pages/Overlay.tsx` + `src/lib/sync.ts` BroadcastChannel, blurred cover, leaderboard, feed
+- **Ph8 Export** ✅ — JSON+CSV+PNG podium (`src/lib/export.ts`)
+- **Ph9 Guide** ✅ — `src/pages/Guide.tsx` at /guide (setup steps, scoring rules, OBS instructions)
 
-**Velocity:**
+**Cleanup done:** old `apps/web`, `apps/bot-worker`, `packages/db`, `packages/shared` removed +
+deploy config (render.yaml, railway.json, docker-compose.yml, .dockerignore) + root db scripts/turbo tasks.
+Workspace now = `apps/app` + `packages/{game-engine,game-types,eslint-config}`.
 
-- Total plans completed: 0 (v2.0)
-- Average duration: —
-- Total execution time: —
+Run: `pnpm dev` (root) → http://localhost:5173. Routes /, /control, /overlay, /guide. Build+types green.
 
-**By Phase:**
+## Connections (added 2026-06-14) — client-side OAuth, still zero-backend
 
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| — | — | — | — |
+OAuth ≠ backend: public-client flows run in-browser with no secret.
+- **Spotify import** — Authorization Code + PKCE (`src/lib/spotify.ts`). Connect → list `/me/playlists`
+  → import tracks (title/artist/featurings) into a Playlist. Dev mode = whitelist ≤25 (streamers only).
+- **Twitch login** — implicit grant (`src/lib/twitch-auth.ts`, Twitch has no PKCE). Auto-fills channel.
+  Convenience only; chat read still anonymous. Does NOT restore the talking bot.
+- Client IDs pasted in Setup → ConnectionsPanel (localStorage), or `VITE_SPOTIFY_CLIENT_ID`/`VITE_TWITCH_CLIENT_ID`.
+- Callback routes `/auth/spotify`, `/auth/twitch`.
+- ⚠️ Spotify dev: open app on **http://127.0.0.1:<port>** (not localhost) so the PKCE verifier stays
+  same-origin and Spotify accepts the redirect.
+- User must register both apps (Spotify dashboard + dev.twitch.tv) with the redirect URIs shown in Setup → Réglages.
 
-*Updated after each plan completion*
-| Phase 06-game-engine-foundation P01 | 3min | 3 tasks | 5 files |
-| Phase 06 P02 | 5min | 3 tasks | 3 files |
-| Phase 06-game-engine-foundation P03 | 3min | 2 tasks | 3 files |
-| Phase 06-game-engine-foundation P04 | 3min | 2 tasks | 2 files |
+## Verified working (2026-06-16)
+
+- OAuth Spotify (PKCE) + Twitch (implicit) connect end-to-end on **https://127.0.0.1:5173**.
+- Dev origin resolved: Spotify blocks hostname `localhost` → must use `https://127.0.0.1`; redirect URIs https + exact-match.
+
+## NEXT (not done)
+
+1. **Full gameplay live test** — confirm justinfan chat → scoring/streak/overlay end-to-end on a live channel
+   (OAuth + UI confirmed; the chat-to-score path still wants a real live-channel run).
+2. **Streak formula** — `STREAK_STEP=0.2` in controller.ts is a guess — tune with user.
+3. **Commit** — branch feat/static-rewrite still not committed (big uncommitted slice + old-back deletion).
+
+## Pivot Summary (2026-06-14)
+
+v2 pivoted from multi-tenant SaaS backend → zero-backend static client app. The talking bot
+(only thing forcing OAuth + server) is dropped, replaced by overlay animations. See ROADMAP.md.
+
+**Locked decisions:**
+- Frontend: Vite + React SPA (static)
+- Sync OBS ↔ control: BroadcastChannel (no server)
+- Music: YouTube IFrame + Spotify embed (multi-source)
+- Config/scores: 100% client (localStorage + JSON import/export)
+- Old code: keep `packages/game-engine` + `packages/game-types`, drop `apps/web` backend, `apps/bot-worker`, `packages/db`
+
+**Verified reusable:** `packages/game-engine` has zero Redis/DB imports — pure scoring, lifts as-is.
 
 ## Accumulated Context
 
-### Architecture
+### Gameplay (already built, reusable)
 
-- Redis channels: `session:cmd:{sessionId}` (web→bot), `overlay:{tenantId}` (bot→SSE), `sessions:events` (web→bot lifecycle)
-- Current migration: 0011_rls_insert_policies.sql — RLS INSERT workaround in place for Render non-superuser
-- All Phase 6 DB migrations must follow the 0011 permissive INSERT policy pattern
-
-### Key Decisions
-
-- Fuzzy matching: Sørensen-Dice bigrams, threshold 0.8; exact substring required for targets ≤5 chars
-- Double-shot penalty design (lose-all vs. no-penalty) must be confirmed before coding penalty path
-- Streak breaks on wrong answer including malus
-- 3 overlay zones as separate URL paths, single SSE endpoint with client-side filtering (not separate SSE routes)
-- SSE payload versioning: add `version: 2` field + new event types additively, never replace existing shapes
-- [06-01] ScoringEvent.reason union extended additively — all 4 v1 values preserved for backward compatibility
-- [06-01] it.todo() used for v2 test stubs — Wave 0 RED contract that plans 02-04 will implement
-- [06-01] Migration 0013 uses USING score::NUMERIC(10,1) for lossless cast of existing integer scores
-- [06-02] fuzzyMatch default tolerance changed to 0.15 (was 0.30) — stricter malus detection per GAME-03
-- [06-02] Double-shot all-or-nothing: partial match returns 0 pts, reason='double_shot', per CONTEXT.md decision
-- [06-02] Post-window guess returns null without consuming answeredViewers slot — viewer's guess not wasted
-- [06-03] GAME-08 window duration tests implemented as real passing tests (Plan 02 already shipped windowDurationMs)
-- [06-03] window=0 behavior: first finder scores (elapsed=0), subsequent viewers (elapsed>=1ms) get null — instant close
-- [06-04] RoundStateManager uses publisher Redis instance (not new connection) to avoid extra connections per session
-- [06-04] Shuffle order: DB-first recovery strategy (sessions.shuffleOrder), then Redis game:shuffle: key, then generate new
-- [06-04] Streak multiplier applied only to positive-point events (not featuring, not malus)
+- Fuzzy matching: Sørensen-Dice bigrams, malus tolerance 0.15, exact substring for targets ≤5 chars
+- Window scoring: first finder max, proportional decay within windowDurationMs
+- Double-shot: all-or-nothing (0 pts if only one of title/artist correct)
+- Streak: breaks on wrong answer including malus; multiplier on positive points only
+- These ship in `packages/game-engine` — Phase 5 wires them into in-memory round state (replaces Redis RoundStateManager)
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
-- [Phase 6]: Double-shot penalty design RESOLVED — all-or-nothing confirmed and implemented in 06-02
-- [Phase 6]: Redis game state persistence key schema RESOLVED — game:round:, game:streak:, game:shuffle: implemented in 06-04
-- [Phase 8]: Streamers must add bot as moderator for 100 msg/30s budget — needs UX surface in dashboard
+- [Phase 4] Spotify embed = 30s preview unless premium SDK+auth — YouTube is the unconstrained path; Spotify support stays within embed limits
+- [Phase 7] BroadcastChannel requires control + overlay on the same machine/browser (streamer's PC running OBS) — acceptable for target use
 
 ## Session Continuity
 
-Last session: 2026-03-18T18:31:00Z
-Stopped at: Completed 06-04-PLAN.md
+Last session: 2026-06-14 — roadmap rewritten for static pivot
+Stopped at: planning complete, ready to plan Phase 01
 Resume file: None

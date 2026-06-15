@@ -2,13 +2,11 @@
   "name": "playground",
   "private": true,
   "scripts": {
-    "build": "turbo build",
-    "dev": "turbo dev --parallel",
+    "build": "pnpm --filter @playground/app build",
+    "dev": "pnpm --filter @playground/app dev",
     "test": "turbo test",
     "type-check": "turbo type-check",
-    "lint": "turbo lint",
-    "db:generate": "turbo db:generate",
-    "db:migrate": "turbo db:migrate"
+    "lint": "turbo lint"
   },
   "devDependencies": {
     "turbo": "2.8.13",

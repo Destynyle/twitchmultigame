@@ -12,6 +12,8 @@ export interface Track {
   featurings: string[]
   malusTerms: string[]
   source: MusicSource
+  /** Album/cover art URL (Spotify has no derivable cover from the id alone) */
+  coverUrl?: string
   /** Optional per-track scoring window override (ms) */
   windowMs?: number
 }

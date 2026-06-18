@@ -64,6 +64,7 @@ export default function Setup() {
       featurings: [],
       malusTerms: [],
       source,
+      ...(meta.cover ? { coverUrl: meta.cover } : {}),
     }
     mutateActive((p) => ({ ...p, tracks: [...p.tracks, track] }))
     setUrlInput('')

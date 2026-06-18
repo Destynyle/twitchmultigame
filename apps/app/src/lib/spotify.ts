@@ -149,13 +149,14 @@ export async function fetchMyPlaylists(): Promise<SpotifyPlaylistRef[]> {
 
 export async function importSpotifyPlaylist(playlistId: string): Promise<Track[]> {
   const tracks: Track[] = []
-  let url: string | null = `/playlists/${playlistId}/tracks?limit=100&fields=next,items(track(id,name,artists(name)))`
+  let url: string | null = `/playlists/${playlistId}/tracks?limit=100&fields=next,items(track(id,name,artists(name),album(images)))`
   while (url) {
     const page: { items: any[]; next: string | null } = await api(url)
     for (const it of page.items) {
       const t = it.track
       if (!t?.id) continue
       const artists: string[] = (t.artists ?? []).map((a: any) => a.name)
+      const cover: string | undefined = t.album?.images?.[0]?.url
       tracks.push({
         id: crypto.randomUUID(),
         title: t.name,
@@ -163,6 +164,7 @@ export async function importSpotifyPlaylist(playlistId: string): Promise<Track[]
         featurings: artists.slice(1),
         malusTerms: [],
         source: { kind: 'spotify', trackId: t.id },
+        ...(cover ? { coverUrl: cover } : {}),
       })
     }
     url = page.next ? page.next.replace('https://api.spotify.com/v1', '') : null

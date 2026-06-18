@@ -189,7 +189,7 @@ export class GameController {
         this.status === 'revealed' && t
           ? { title: t.title, artist: t.artist, featurings: t.featurings }
           : null,
-      coverUrl: t ? coverUrl(t.source) : null,
+      coverUrl: t ? (t.coverUrl ?? coverUrl(t.source)) : null,
       found: this.found,
       leaderboard: this.leaderboard(),
       feed: this.feed,

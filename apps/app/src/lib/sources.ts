@@ -31,22 +31,22 @@ export function coverUrl(source: MusicSource): string | null {
 // YouTube oEmbed is public and CORS-enabled; Spotify oEmbed returns title only.
 export async function fetchMeta(
   source: MusicSource,
-): Promise<{ title?: string; artist?: string }> {
+): Promise<{ title?: string; artist?: string; cover?: string }> {
   try {
     if (source.kind === 'youtube') {
       const r = await fetch(
         `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${source.videoId}&format=json`,
       )
       if (!r.ok) return {}
-      const j = (await r.json()) as { title?: string; author_name?: string }
-      return { title: j.title, artist: j.author_name }
+      const j = (await r.json()) as { title?: string; author_name?: string; thumbnail_url?: string }
+      return { title: j.title, artist: j.author_name, cover: j.thumbnail_url }
     }
     const r = await fetch(
       `https://open.spotify.com/oembed?url=https://open.spotify.com/track/${source.trackId}`,
     )
     if (!r.ok) return {}
-    const j = (await r.json()) as { title?: string }
-    return { title: j.title }
+    const j = (await r.json()) as { title?: string; thumbnail_url?: string }
+    return { title: j.title, cover: j.thumbnail_url }
   } catch {
     return {}
   }

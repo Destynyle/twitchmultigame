@@ -17,7 +17,10 @@ const router = createBrowserRouter([
   { path: '/auth/spotify', element: <AuthSpotify /> },
   { path: '/auth/twitch', element: <AuthTwitch /> },
   { path: '*', element: <Navigate to="/" replace /> },
-])
+], {
+  // GitHub Pages serves the app under /<repo>/ in prod; '/' in dev.
+  basename: import.meta.env.BASE_URL.replace(/\/$/, '') || '/',
+})
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

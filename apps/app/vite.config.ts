@@ -3,7 +3,10 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  // GitHub Pages serves a project site under /<repo>/, so production assets and
+  // routes need that base path. Dev stays at root.
+  base: command === 'build' ? '/twitchmultigame/' : '/',
   // HTTPS on 127.0.0.1 so BOTH OAuth providers accept the redirect URI:
   // Spotify rejects the hostname `localhost` entirely (needs the loopback IP
   // literal 127.0.0.1) and forbids http except loopback; Twitch requires https
@@ -23,4 +26,4 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@playground/game-engine', '@playground/game-types'],
   },
-})
+}))

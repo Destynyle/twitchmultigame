@@ -81,7 +81,9 @@
       "Bash(kill %1)",
       "Bash(cp \"/home/desty/.local/share/klipper/data/478c24cad541fce9a9bba23438426302e8796158/478c24cad541fce9a9bba23438426302e8796158\" /tmp/shot1.png)",
       "Bash(cp \"/home/desty/.local/share/klipper/data/d52a4c85dd4df1c32e220030aa121b429af25073/d52a4c85dd4df1c32e220030aa121b429af25073\" /tmp/shot2.png)",
-      "Bash(pkill -f \"vite\")"
+      "Bash(pkill -f \"vite\")",
+      "Bash(mkdir -p public)",
+      "Bash(:)"
     ]
   }
 }

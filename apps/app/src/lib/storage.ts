@@ -1,14 +1,21 @@
 import type { Playlist } from './types'
+import { cleanTitle } from './sanitize'
 
 const PLAYLISTS_KEY = 'blindtest:playlists'
 const CHANNEL_KEY = 'blindtest:channel'
+
+// Re-sanitize titles on the way in so playlists imported before the sanitizer
+// existed (or hand-edited) get cleaned too — not just fresh imports.
+function sanitizePlaylist(p: Playlist): Playlist {
+  return { ...p, tracks: p.tracks.map((t) => ({ ...t, title: cleanTitle(t.title) })) }
+}
 
 export function loadPlaylists(): Playlist[] {
   try {
     const raw = localStorage.getItem(PLAYLISTS_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? (parsed as Playlist[]) : []
+    return Array.isArray(parsed) ? (parsed as Playlist[]).map(sanitizePlaylist) : []
   } catch {
     return []
   }
@@ -39,9 +46,9 @@ export function exportPlaylist(playlist: Playlist): void {
 export function parsePlaylistFile(text: string): Playlist {
   const obj = JSON.parse(text) as Playlist
   if (!obj.tracks || !Array.isArray(obj.tracks)) throw new Error('Fichier playlist invalide')
-  return {
+  return sanitizePlaylist({
     id: obj.id || crypto.randomUUID(),
     name: obj.name || 'Importée',
     tracks: obj.tracks,
-  }
+  })
 }

@@ -24,14 +24,16 @@ export default function Overlay() {
 
   return (
     <div className="grid h-screen grid-cols-[1fr_320px] gap-4 p-4">
-      {/* Player zone — blurred cover until found */}
-      <div className="relative flex items-center justify-center">
+      {/* Player zone — heavily blurred cover until found (must be unrecognizable) */}
+      <div className="relative flex items-center justify-center overflow-hidden rounded-2xl">
         {snap.coverUrl ? (
           <img
             src={snap.coverUrl}
             alt=""
             className={`max-h-[70vh] rounded-2xl shadow-2xl transition-all duration-700 ${
-              snap.found || revealed ? 'blur-0 scale-100' : 'blur-2xl scale-95'
+              snap.found || revealed
+                ? 'blur-0 scale-100 brightness-100'
+                : 'blur-[90px] scale-125 brightness-75 saturate-150'
             }`}
           />
         ) : (

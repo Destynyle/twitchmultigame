@@ -116,13 +116,19 @@ export default function ConnectionsPanel({
     <section className="mb-6 rounded-xl bg-white/5 p-4">
       <div className="flex items-center gap-2">
         <h2 className="text-sm font-semibold">Connexions</h2>
-        <button onClick={() => setOpen((o) => !o)} className="text-xs text-white/40 hover:text-white">
-          {open ? 'masquer réglages' : 'réglages'}
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-white/70 transition-all duration-150 hover:scale-105 hover:border-white/30 hover:bg-white/20 hover:text-white active:scale-95"
+        >
+          <span className={`inline-block transition-transform duration-300 ${open ? 'rotate-90' : ''}`}>
+            ⚙️
+          </span>
+          {open ? 'Masquer' : 'Réglages'}
         </button>
         <div className="ml-auto flex gap-2">
           <button
             onClick={() => safe(beginTwitchAuth)}
-            className="rounded-lg bg-[#9146FF]/80 px-3 py-1.5 text-sm hover:bg-[#9146FF]"
+            className="rounded-lg bg-[#9146FF]/80 px-3 py-1.5 text-sm transition-all duration-150 hover:scale-105 hover:bg-[#9146FF] active:scale-95"
           >
             {twitchOn ? 'Twitch ✓' : 'Connecter Twitch'}
           </button>
@@ -130,14 +136,14 @@ export default function ConnectionsPanel({
             <button
               onClick={loadPlaylists}
               disabled={busy}
-              className="rounded-lg bg-[#1DB954]/80 px-3 py-1.5 text-sm text-black hover:bg-[#1DB954] disabled:opacity-50"
+              className="rounded-lg bg-[#1DB954]/80 px-3 py-1.5 text-sm text-black transition-all duration-150 hover:scale-105 hover:bg-[#1DB954] active:scale-95 disabled:opacity-50"
             >
               Importer playlist Spotify
             </button>
           ) : (
             <button
               onClick={() => safe(() => void beginSpotifyAuth())}
-              className="rounded-lg bg-[#1DB954]/80 px-3 py-1.5 text-sm text-black hover:bg-[#1DB954]"
+              className="rounded-lg bg-[#1DB954]/80 px-3 py-1.5 text-sm text-black transition-all duration-150 hover:scale-105 hover:bg-[#1DB954] active:scale-95"
             >
               Connecter Spotify
             </button>

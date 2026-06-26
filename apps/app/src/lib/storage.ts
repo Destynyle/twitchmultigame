@@ -1,4 +1,4 @@
-import type { Playlist } from './types'
+import type { Playlist, Track } from './types'
 import { cleanTitle } from './sanitize'
 
 const PLAYLISTS_KEY = 'blindtest:playlists'
@@ -23,6 +23,24 @@ export function loadPlaylists(): Playlist[] {
 
 export function savePlaylists(playlists: Playlist[]): void {
   localStorage.setItem(PLAYLISTS_KEY, JSON.stringify(playlists))
+}
+
+/** Patch one track (by id) across all playlists and persist. */
+export function updateTrack(
+  trackId: string,
+  patch: Partial<Pick<Track, 'title' | 'artist' | 'featurings' | 'malusTerms'>>,
+): void {
+  const playlists = loadPlaylists()
+  let changed = false
+  for (const p of playlists) {
+    for (const t of p.tracks) {
+      if (t.id === trackId) {
+        Object.assign(t, patch)
+        changed = true
+      }
+    }
+  }
+  if (changed) savePlaylists(playlists)
 }
 
 export function loadChannel(): string {

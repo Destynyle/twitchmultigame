@@ -11,6 +11,7 @@ import {
 } from '../lib/storage'
 import { parseSource, fetchMeta } from '../lib/sources'
 import ConnectionsPanel from '../components/ConnectionsPanel'
+import Footer from '../components/Footer'
 
 const ACTIVE_KEY = 'blindtest:activePlaylist'
 
@@ -220,10 +221,12 @@ export default function Setup() {
 
       <button
         onClick={start}
-        className="mt-6 w-full rounded-xl bg-green-500 py-3 font-semibold text-black hover:bg-green-400"
+        className="mt-6 w-full rounded-xl bg-green-500 py-3 font-semibold text-black transition-all duration-150 hover:scale-[1.02] hover:bg-green-400 active:scale-100"
       >
         Lancer le panneau de contrôle →
       </button>
+
+      <Footer />
     </div>
   )
 }

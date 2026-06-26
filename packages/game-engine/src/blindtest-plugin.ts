@@ -130,6 +130,24 @@ export class BlindtestPlugin implements GamePlugin {
     return this.trackState?.titleWindowAt ?? null
   }
 
+  /**
+   * Fix the answer mid-round (streamer forgot to set it) WITHOUT resetting the
+   * scoring state — windows, scorers and malus counters are preserved.
+   */
+  updateAnswer(patch: {
+    title?: string
+    artist?: string | null
+    featurings?: string[]
+    malusTerms?: string[]
+  }): void {
+    const s = this.trackState
+    if (!s) return
+    if (patch.title !== undefined) s.title = patch.title
+    if (patch.artist !== undefined) s.artist = patch.artist
+    if (patch.featurings !== undefined) s.featurings = patch.featurings
+    if (patch.malusTerms !== undefined) s.malusTerms = patch.malusTerms
+  }
+
   async onChatMessage(
     ctx: SessionContext,
     message: ChatMessage

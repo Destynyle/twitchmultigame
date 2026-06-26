@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import Footer from '../components/Footer'
 
 export default function Guide() {
   return (
@@ -100,6 +101,8 @@ export default function Guide() {
           <li>Type de client : <b>Publique</b>. Copie le Client ID → Réglages.</li>
         </ol>
       </Section>
+
+      <Footer />
     </div>
   )
 }

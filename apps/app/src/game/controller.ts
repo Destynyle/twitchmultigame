@@ -207,6 +207,23 @@ export class GameController {
     this.clearTimers()
   }
 
+  /** Fix the current track's answer on the fly (title/artist/feat/malus). */
+  editCurrentTrack(patch: {
+    title?: string
+    artist?: string | null
+    featurings?: string[]
+    malusTerms?: string[]
+  }): void {
+    const t = this.currentTrack
+    if (!t) return
+    if (patch.title !== undefined) t.title = patch.title
+    if (patch.artist !== undefined) t.artist = patch.artist
+    if (patch.featurings !== undefined) t.featurings = patch.featurings
+    if (patch.malusTerms !== undefined) t.malusTerms = patch.malusTerms
+    if (this.status === 'playing') this.plugin.updateAnswer(patch)
+    this.emit()
+  }
+
   adjustScore(username: string, delta: number): void {
     const s = this.scores.get(username)
     if (!s) return

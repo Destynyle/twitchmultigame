@@ -3,12 +3,13 @@ import { Link, useNavigate } from 'react-router-dom'
 import { GameController } from '../game/controller'
 import { TwitchChatReader } from '../lib/twitch-chat'
 import { createPublisher } from '../lib/sync'
-import { loadPlaylists, loadChannel } from '../lib/storage'
-import type { GameSnapshot, Playlist } from '../lib/types'
+import { loadPlaylists, loadChannel, updateTrack } from '../lib/storage'
+import type { GameSnapshot, Playlist, Track } from '../lib/types'
 import { exportScoresJson, exportScoresCsv, exportPodiumPng } from '../lib/export'
 import Player from '../components/Player'
 import Leaderboard from '../components/Leaderboard'
 import Feed from '../components/Feed'
+import Footer from '../components/Footer'
 
 const ACTIVE_KEY = 'blindtest:activePlaylist'
 
@@ -61,7 +62,8 @@ export default function Control() {
   const podium = snap.status === 'revealed' ? ctrl.roundPodium() : []
 
   return (
-    <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 p-4 lg:grid-cols-[1fr_360px]">
+    <div className="mx-auto max-w-6xl p-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
       {/* Left: player + controls */}
       <div className="flex flex-col gap-4">
         <header className="flex items-center gap-3 text-sm">
@@ -86,36 +88,37 @@ export default function Control() {
         <Player source={track?.source ?? null} active={snap.status === 'playing'} />
 
         <div className="rounded-xl bg-white/5 p-4">
-          <div className="mb-3 text-sm">
-            {track ? (
-              <>
-                <span className="text-white/40">Réponse : </span>
-                <span className="font-medium">{track.title}</span>
-                {track.artist && <span className="text-white/60"> — {track.artist}</span>}
-              </>
-            ) : (
-              <span className="text-white/40">Aucune piste</span>
-            )}
-          </div>
+          {track ? (
+            <CurrentTrackEditor
+              key={track.id}
+              track={track}
+              onSave={(patch) => {
+                ctrl.editCurrentTrack(patch)
+                updateTrack(track.id, patch)
+              }}
+            />
+          ) : (
+            <div className="mb-3 text-sm text-white/40">Aucune piste</div>
+          )}
           <div className="flex gap-2">
             <button
               onClick={() => void ctrl.startRound()}
               disabled={snap.status === 'playing' || !track}
-              className="flex-1 rounded-lg bg-green-500 py-2 font-medium text-black disabled:opacity-30"
+              className="flex-1 rounded-lg bg-green-500 py-2 font-medium text-black transition-all duration-150 hover:enabled:scale-105 hover:enabled:bg-green-400 active:enabled:scale-95 disabled:opacity-30"
             >
               ▶ Démarrer
             </button>
             <button
               onClick={() => void ctrl.reveal()}
               disabled={snap.status !== 'playing'}
-              className="flex-1 rounded-lg bg-amber-500 py-2 font-medium text-black disabled:opacity-30"
+              className="flex-1 rounded-lg bg-amber-500 py-2 font-medium text-black transition-all duration-150 hover:enabled:scale-105 hover:enabled:bg-amber-400 active:enabled:scale-95 disabled:opacity-30"
             >
               👁 Révéler
             </button>
             <button
               onClick={() => ctrl.next()}
               disabled={snap.trackIndex >= snap.trackTotal - 1 && snap.status === 'idle'}
-              className="flex-1 rounded-lg bg-white/10 py-2 font-medium disabled:opacity-30"
+              className="flex-1 rounded-lg bg-white/10 py-2 font-medium transition-all duration-150 hover:enabled:scale-105 hover:enabled:bg-white/20 active:enabled:scale-95 disabled:opacity-30"
             >
               ⏭ Suivant
             </button>
@@ -170,8 +173,82 @@ export default function Control() {
           <Feed events={snap.feed} />
         </div>
       </div>
+      </div>
+      <Footer />
     </div>
   )
+}
+
+/** Editable answer for the current track — fix title/artist mid-game. */
+function CurrentTrackEditor({
+  track,
+  onSave,
+}: {
+  track: Track
+  onSave: (patch: {
+    title?: string
+    artist?: string | null
+    featurings?: string[]
+    malusTerms?: string[]
+  }) => void
+}) {
+  const [title, setTitle] = useState(track.title)
+  const [artist, setArtist] = useState(track.artist ?? '')
+  const [feats, setFeats] = useState(track.featurings.join(', '))
+  const [malus, setMalus] = useState(track.malusTerms.join(', '))
+  const field =
+    'w-full rounded bg-black/30 px-2 py-1 text-sm outline-none transition-colors focus:bg-black/50'
+  return (
+    <div className="mb-3">
+      <div className="mb-1 text-xs text-white/40">Réponse — modifiable en direct</div>
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={() => title !== track.title && onSave({ title })}
+          placeholder="Titre"
+          className={field}
+        />
+        <input
+          value={artist}
+          onChange={(e) => setArtist(e.target.value)}
+          onBlur={() => {
+            const a = artist.trim() ? artist : null
+            if (a !== track.artist) onSave({ artist: a })
+          }}
+          placeholder="Artiste (vide = titre seul)"
+          className={field}
+        />
+        <input
+          value={feats}
+          onChange={(e) => setFeats(e.target.value)}
+          onBlur={() => {
+            const list = splitList(feats)
+            if (list.join(' ') !== track.featurings.join(' ')) onSave({ featurings: list })
+          }}
+          placeholder="Featurings (séparés par ,)"
+          className={field}
+        />
+        <input
+          value={malus}
+          onChange={(e) => setMalus(e.target.value)}
+          onBlur={() => {
+            const list = splitList(malus)
+            if (list.join(' ') !== track.malusTerms.join(' ')) onSave({ malusTerms: list })
+          }}
+          placeholder="Pièges malus (séparés par ,)"
+          className={field}
+        />
+      </div>
+    </div>
+  )
+}
+
+function splitList(v: string): string[] {
+  return v
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
 }
 
 function StatusDot({ status }: { status: string }) {

@@ -1,3 +1,4 @@
+import { cleanTitle } from './sanitize'
 import type { MusicSource } from './types'
 
 // Parse a pasted URL/ID into a MusicSource. Supports YouTube and Spotify.
@@ -39,14 +40,14 @@ export async function fetchMeta(
       )
       if (!r.ok) return {}
       const j = (await r.json()) as { title?: string; author_name?: string; thumbnail_url?: string }
-      return { title: j.title, artist: j.author_name, cover: j.thumbnail_url }
+      return { title: j.title ? cleanTitle(j.title) : undefined, artist: j.author_name, cover: j.thumbnail_url }
     }
     const r = await fetch(
       `https://open.spotify.com/oembed?url=https://open.spotify.com/track/${source.trackId}`,
     )
     if (!r.ok) return {}
     const j = (await r.json()) as { title?: string; thumbnail_url?: string }
-    return { title: j.title, cover: j.thumbnail_url }
+    return { title: j.title ? cleanTitle(j.title) : undefined, cover: j.thumbnail_url }
   } catch {
     return {}
   }

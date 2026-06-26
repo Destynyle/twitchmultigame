@@ -1,4 +1,5 @@
 import { getSpotifyClientId, spotifyRedirectUri } from './connections'
+import { cleanTitle } from './sanitize'
 import type { Track } from './types'
 
 // Spotify Authorization Code flow with PKCE — no client secret, runs in-browser.
@@ -159,7 +160,7 @@ export async function importSpotifyPlaylist(playlistId: string): Promise<Track[]
       const cover: string | undefined = t.album?.images?.[0]?.url
       tracks.push({
         id: crypto.randomUUID(),
-        title: t.name,
+        title: cleanTitle(t.name),
         artist: artists[0] ?? null,
         featurings: artists.slice(1),
         malusTerms: [],

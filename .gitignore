@@ -45,3 +45,7 @@ coverage/
 *.mp4
 *.mkv
 *.avi
+
+# Repos imbriqués sans rapport (pas des submodules)
+blindtest/
+testbmad/

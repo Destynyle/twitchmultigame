@@ -1,5 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { MusicSource } from '../lib/types'
+import { getPlaybackMode, getSpotifyDevice } from '../lib/playback'
+import { playTrack, pausePlayback } from '../lib/spotify'
 
 // Unified player. YouTube uses the IFrame API for programmatic play/pause/seek;
 // Spotify uses its embed (playback control limited to the embed's own UI).
@@ -39,6 +41,11 @@ export default function Player({ source, active }: { source: MusicSource | null;
   if (source.kind === 'youtube') {
     return <YouTubePlayer videoId={source.videoId} active={active} />
   }
+  // Spotify: Connect mode drives the desktop app (full song, VOD-safe via OBS);
+  // otherwise fall back to the 30s embed.
+  if (getPlaybackMode() === 'connect') {
+    return <SpotifyConnectPlayer trackId={source.trackId} active={active} />
+  }
   return (
     <iframe
       title="spotify"
@@ -46,6 +53,44 @@ export default function Player({ source, active }: { source: MusicSource | null;
       src={`https://open.spotify.com/embed/track/${source.trackId}?utm_source=blindtest`}
       allow="autoplay; encrypted-media"
     />
+  )
+}
+
+function SpotifyConnectPlayer({ trackId, active }: { trackId: string; active: boolean }) {
+  const [error, setError] = useState('')
+  const device = getSpotifyDevice()
+
+  useEffect(() => {
+    let cancelled = false
+    if (active) {
+      // Only the play path surfaces errors (no device / not Premium / re-auth).
+      playTrack(trackId, device?.id)
+        .then(() => !cancelled && setError(''))
+        .catch((e) => !cancelled && setError((e as Error).message))
+    } else {
+      // Pause is best-effort; stay quiet when idle (e.g. no active device yet).
+      void pausePlayback(device?.id).catch(() => {})
+    }
+    return () => {
+      cancelled = true
+    }
+    // Re-issue on track change or play/pause toggle. device id read once per render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trackId, active])
+
+  return (
+    <div className="flex h-44 flex-col items-center justify-center gap-1 rounded-xl bg-[#1DB954]/10 text-center">
+      <div className="text-2xl">{active ? '▶️' : '⏸️'}</div>
+      <div className="text-sm font-medium text-[#1DB954]">Lecture sur l'app Spotify</div>
+      <div className="text-xs text-white/40">
+        {device ? `Appareil : ${device.name}` : 'Appareil actif'} · son complet
+      </div>
+      {error ? (
+        <div className="mt-1 max-w-xs px-3 text-xs text-red-400">{error}</div>
+      ) : (
+        <div className="text-[10px] text-white/30">Route ce son vers une piste OBS hors-VOD (voir Guide)</div>
+      )}
+    </div>
   )
 }
 

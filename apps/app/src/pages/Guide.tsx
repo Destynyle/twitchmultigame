@@ -38,6 +38,26 @@ export default function Guide() {
           <li>Garde le panneau de contrôle ouvert dans le <b>même navigateur, sur le même PC</b> : la synchro se fait sans serveur (BroadcastChannel).</li>
           <li>Le son de la musique vient de l'onglet contrôle — capture-le via l'audio bureau d'OBS.</li>
         </ol>
+        <p className="mt-3 mb-1 font-medium">🎧 Éviter les strikes DMCA sur la VOD</p>
+        <p className="mb-2 text-white/70">
+          Aucun mode ne « strip » automatiquement la musique : c'est <b>ton routage OBS</b> qui rend
+          la VOD safe. Le mieux : mets la musique sur une <b>piste audio séparée exclue de la VOD</b>.
+        </p>
+        <ol className="list-decimal space-y-1 pl-5 text-white/80">
+          <li>
+            Choisis le mode <b>App Spotify</b> (Connexions → réglages → Lecture). Le son sort alors de
+            l'app desktop, <b>appli séparée</b> facile à isoler (Premium requis). YouTube se capture
+            pareil via sa propre source.
+          </li>
+          <li>
+            Dans OBS : capture la musique via une source dédiée (Application Audio Capture / l'app
+            Spotify), <b>pas</b> mélangée au reste.
+          </li>
+          <li>
+            Mixer audio avancé → Propriétés audio → décoche la <b>piste VOD/enregistrement</b> pour
+            cette source (garde-la sur la piste live). Les viewers entendent, la VOD non.
+          </li>
+        </ol>
       </Section>
 
       <Section title="4. Importer une playlist Spotify (ton app, à toi)">

@@ -15,9 +15,17 @@ import {
   disconnectSpotify,
   fetchMyPlaylists,
   importSpotifyPlaylist,
+  getDevices,
   type SpotifyPlaylistRef,
 } from '../lib/spotify'
 import { beginTwitchAuth, isTwitchConnected } from '../lib/twitch-auth'
+import {
+  getPlaybackMode,
+  setPlaybackMode,
+  getSpotifyDevice,
+  setSpotifyDevice,
+  type PlaybackMode,
+} from '../lib/playback'
 
 export default function ConnectionsPanel({
   onImport,
@@ -33,6 +41,33 @@ export default function ConnectionsPanel({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState('')
+  const [mode, setMode] = useState<PlaybackMode>(getPlaybackMode())
+  const [devices, setDevices] = useState<{ id: string; name: string }[] | null>(null)
+  const [deviceId, setDeviceId] = useState(getSpotifyDevice()?.id ?? '')
+
+  function changeMode(m: PlaybackMode) {
+    setMode(m)
+    setPlaybackMode(m)
+  }
+
+  async function loadDevices() {
+    setError('')
+    setBusy(true)
+    try {
+      const list = await getDevices()
+      setDevices(list.map((d) => ({ id: d.id, name: `${d.name} (${d.type})` })))
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function pickDevice(id: string) {
+    setDeviceId(id)
+    const d = devices?.find((x) => x.id === id)
+    setSpotifyDevice(id && d ? { id, name: d.name } : null)
+  }
 
   function copy(text: string) {
     void navigator.clipboard?.writeText(text)
@@ -157,6 +192,69 @@ export default function ConnectionsPanel({
               <RedirectRow uri={twitchRedirectUri()} copied={copied} onCopy={copy} />
             </label>
           </div>
+          <div className="mt-3 border-t border-white/10 pt-3">
+            <p className="mb-1 text-xs font-medium text-white/60">Lecture des pistes Spotify</p>
+            <div className="flex flex-col gap-1.5 text-xs text-white/80">
+              <label className="flex items-start gap-2">
+                <input
+                  type="radio"
+                  name="pbmode"
+                  checked={mode === 'embed'}
+                  onChange={() => changeMode('embed')}
+                  className="mt-0.5"
+                />
+                <span>
+                  <b>Lecteur navigateur</b> — extrait 30s, aucun Premium. ⚠️ Son mélangé à l'onglet,
+                  dur à exclure de la VOD.
+                </span>
+              </label>
+              <label className="flex items-start gap-2">
+                <input
+                  type="radio"
+                  name="pbmode"
+                  checked={mode === 'connect'}
+                  onChange={() => changeMode('connect')}
+                  className="mt-0.5"
+                />
+                <span>
+                  <b>App Spotify</b> — son complet via ton app desktop. <b>Premium requis.</b> Appli
+                  séparée → routable vers une piste OBS hors-VOD (anti-strike).
+                </span>
+              </label>
+            </div>
+
+            {mode === 'connect' && (
+              <div className="mt-2 rounded-lg bg-white/5 p-2">
+                <div className="flex items-center gap-2">
+                  <select
+                    value={deviceId}
+                    onChange={(e) => pickDevice(e.target.value)}
+                    className="flex-1 rounded bg-black/30 px-2 py-1 text-xs"
+                  >
+                    <option value="">Appareil actif (auto)</option>
+                    {devices?.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={loadDevices}
+                    disabled={busy}
+                    className="rounded bg-white/10 px-2 py-1 text-xs hover:bg-white/20 disabled:opacity-50"
+                  >
+                    Rafraîchir appareils
+                  </button>
+                </div>
+                <p className="mt-1 text-[10px] text-white/30">
+                  Ouvre l'app Spotify desktop et lance une lecture une fois pour qu'elle apparaisse.
+                  Si tu as connecté Spotify avant cette fonctionnalité, reconnecte-toi pour autoriser
+                  le pilotage.
+                </p>
+              </div>
+            )}
+          </div>
+
           {spotifyOn && (
             <button onClick={disconnectSpotify} className="mt-2 text-left text-xs text-white/30 hover:text-red-400">
               Déconnecter Spotify

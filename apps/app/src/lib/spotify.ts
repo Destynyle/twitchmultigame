@@ -7,7 +7,10 @@ import type { Track } from './types'
 
 const AUTH_URL = 'https://accounts.spotify.com/authorize'
 const TOKEN_URL = 'https://accounts.spotify.com/api/token'
-const SCOPES = 'playlist-read-private playlist-read-collaborative'
+// playlist-read-* for importing; user-*-playback-state to drive the desktop app
+// (Connect mode). Granting playback scopes needs a reconnect for existing users.
+const SCOPES =
+  'playlist-read-private playlist-read-collaborative user-modify-playback-state user-read-playback-state'
 const TOKEN_KEY = 'blindtest:spotifyToken'
 const VERIFIER_KEY = 'blindtest:spotifyVerifier'
 
@@ -128,6 +131,49 @@ async function api<T>(path: string): Promise<T> {
   })
   if (!res.ok) throw new Error(`Spotify API ${res.status}`)
   return res.json() as Promise<T>
+}
+
+// ─── Connect playback (control the desktop app) ────────────────────────────────
+async function playerPut(path: string, body?: unknown): Promise<void> {
+  const token = await validAccessToken()
+  const res = await fetch(`https://api.spotify.com/v1${path}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  })
+  if (res.ok || res.status === 204) return
+  if (res.status === 404) {
+    throw new Error("Aucun appareil Spotify actif — ouvre l'app Spotify et lance/sélectionne-la une fois")
+  }
+  if (res.status === 403) throw new Error('Spotify Premium requis pour piloter la lecture (mode App)')
+  if (res.status === 401) throw new Error('Reconnecte Spotify (nouvelles permissions de lecture)')
+  throw new Error(`Spotify lecture ${res.status}`)
+}
+
+export interface SpotifyDevice {
+  id: string
+  name: string
+  type: string
+  is_active: boolean
+}
+
+export async function getDevices(): Promise<SpotifyDevice[]> {
+  const j = await api<{ devices: SpotifyDevice[] }>('/me/player/devices')
+  return j.devices ?? []
+}
+
+/** Start a track on the user's Spotify desktop app (full song, Premium). */
+export async function playTrack(trackId: string, deviceId?: string): Promise<void> {
+  const q = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : ''
+  await playerPut(`/me/player/play${q}`, { uris: [`spotify:track:${trackId}`] })
+}
+
+export async function pausePlayback(deviceId?: string): Promise<void> {
+  const q = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : ''
+  await playerPut(`/me/player/pause${q}`)
 }
 
 // ─── Data ─────────────────────────────────────────────────────────────────────

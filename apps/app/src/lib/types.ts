@@ -41,6 +41,8 @@ export interface FeedEvent {
   kind: FeedKind
   text: string
   at: number
+  /** Player tied to the event (for the overlay popup); absent for system events */
+  author?: string
 }
 
 /** Snapshot broadcast from Control → Overlay (read-only mirror) */

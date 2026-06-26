@@ -1,11 +1,27 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createSubscriber } from '../lib/sync'
-import type { GameSnapshot } from '../lib/types'
+import type { FeedKind, GameSnapshot } from '../lib/types'
 import Leaderboard from '../components/Leaderboard'
 import Feed from '../components/Feed'
 
+interface Pop {
+  key: string
+  author?: string
+  detail: string
+  kind: FeedKind
+  x: number
+  dur: number
+  emphasis: boolean
+}
+
+// Feed kinds that spawn a falling popup (score-related only).
+const POPUP_KINDS = new Set<FeedKind>(['found', 'malus', 'featuring'])
+
 export default function Overlay() {
   const [snap, setSnap] = useState<GameSnapshot | null>(null)
+  const [pops, setPops] = useState<Pop[]>([])
+  const seenIds = useRef<Set<string>>(new Set())
+  const initialized = useRef(false)
 
   useEffect(() => {
     document.body.classList.add('overlay')
@@ -15,6 +31,34 @@ export default function Overlay() {
       sub.close()
     }
   }, [])
+
+  // Spawn a falling popup for each NEW score event. The first snapshot only seeds
+  // the seen-set (the feed may already hold up to 40 events) to avoid an avalanche.
+  useEffect(() => {
+    if (!snap) return
+    if (!initialized.current) {
+      for (const e of snap.feed) seenIds.current.add(e.id)
+      initialized.current = true
+      return
+    }
+    const fresh = snap.feed.filter((e) => !seenIds.current.has(e.id) && POPUP_KINDS.has(e.kind))
+    if (fresh.length === 0) return
+    // feed is newest-first; reverse so popups appear in chronological order.
+    const newPops = fresh.reverse().map((e): Pop => {
+      seenIds.current.add(e.id)
+      const detail = e.author && e.text.startsWith(e.author) ? e.text.slice(e.author.length).trim() : e.text
+      return {
+        key: e.id,
+        ...(e.author ? { author: e.author } : {}),
+        detail,
+        kind: e.kind,
+        x: 5 + Math.random() * 80,
+        dur: 3.2 + Math.random() * 0.8,
+        emphasis: e.kind === 'found' && /[🎯🔥]/u.test(e.text),
+      }
+    })
+    setPops((prev) => [...prev, ...newPops].slice(-10))
+  }, [snap])
 
   if (!snap) {
     return <div className="grid h-screen place-items-center text-white/30">En attente du contrôle…</div>
@@ -71,6 +115,59 @@ export default function Overlay() {
         <div className="flex-1 overflow-hidden rounded-2xl bg-black/60 p-4 backdrop-blur">
           <Feed events={snap.feed.slice(0, 12)} />
         </div>
+      </div>
+
+      {/* Falling event popups (full-screen, non-interactive) */}
+      <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden">
+        {pops.map((p) => (
+          <EventPopup
+            key={p.key}
+            pop={p}
+            onDone={() => setPops((prev) => prev.filter((x) => x.key !== p.key))}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const POP_STYLE: Record<FeedKind, string> = {
+  found: 'bg-emerald-500/90 text-white',
+  malus: 'bg-red-500/90 text-white',
+  featuring: 'bg-cyan-500/90 text-white',
+  streak: 'bg-amber-400/90 text-black',
+  system: 'bg-white/20 text-white',
+}
+
+/** A single popup that drops from the top and removes itself when done. */
+function EventPopup({ pop, onDone }: { pop: Pop; onDone: () => void }) {
+  // Fallback removal in case the CSS animationend never fires (e.g. background tab).
+  useEffect(() => {
+    const t = setTimeout(onDone, pop.dur * 1000 + 600)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const tone = pop.emphasis ? 'bg-amber-400/95 text-black ring-2 ring-amber-200' : POP_STYLE[pop.kind]
+  return (
+    <div
+      className="animate-fall absolute top-0"
+      style={{ left: `${pop.x}%`, ['--fall-dur' as string]: `${pop.dur}s` }}
+      onAnimationEnd={onDone}
+    >
+      <div
+        className={`flex flex-col items-center rounded-xl px-4 py-2 text-center shadow-2xl backdrop-blur ${tone} ${
+          pop.emphasis ? 'scale-110' : ''
+        }`}
+      >
+        {pop.author && (
+          <span className={`font-extrabold leading-tight ${pop.emphasis ? 'text-xl' : 'text-base'}`}>
+            {pop.author}
+          </span>
+        )}
+        <span className={`font-semibold leading-tight ${pop.author ? 'text-sm opacity-90' : 'text-base'}`}>
+          {pop.detail}
+        </span>
       </div>
     </div>
   )

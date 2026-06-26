@@ -120,7 +120,7 @@ export class GameController {
     if (ev.reason === 'malus') {
       score.points += ev.points // negative
       this.roundMalus.add(ev.viewerUsername)
-      this.pushFeed('malus', `${score.displayName} ${ev.points} (malus 💀)`)
+      this.pushFeed('malus', `${score.displayName} ${ev.points} (malus 💀)`, score.displayName)
       this.emit()
       return
     }
@@ -128,7 +128,7 @@ export class GameController {
     if (ev.reason === 'featuring') {
       score.points += ev.points
       if (ev.label && !this.revealedFeats.includes(ev.label)) this.revealedFeats.push(ev.label)
-      this.pushFeed('featuring', `${score.displayName} +${ev.points} (feat 🎤)`)
+      this.pushFeed('featuring', `${score.displayName} +${ev.points} (feat 🎤)`, score.displayName)
       this.emit()
       return
     }
@@ -147,7 +147,7 @@ export class GameController {
           ? ' (artiste 🎸)'
           : ''
     const streakTag = streak > 0 ? ` 🔥x${mult.toFixed(2)}` : ''
-    this.pushFeed('found', `${score.displayName} +${final}${tag}${streakTag}`)
+    this.pushFeed('found', `${score.displayName} +${final}${tag}${streakTag}`, score.displayName)
     // Open the reveal countdown for each target the first finder just claimed.
     if (ev.reason === 'correct_title' || ev.reason === 'combo') this.scheduleReveal('title')
     if (ev.reason === 'correct_artist' || ev.reason === 'combo') this.scheduleReveal('artist')
@@ -242,8 +242,8 @@ export class GameController {
     return s
   }
 
-  private pushFeed(kind: FeedEvent['kind'], text: string): void {
-    this.feed.unshift({ id: `f${feedSeq++}`, kind, text, at: Date.now() })
+  private pushFeed(kind: FeedEvent['kind'], text: string, author?: string): void {
+    this.feed.unshift({ id: `f${feedSeq++}`, kind, text, at: Date.now(), ...(author ? { author } : {}) })
     if (this.feed.length > FEED_MAX) this.feed.length = FEED_MAX
   }
 

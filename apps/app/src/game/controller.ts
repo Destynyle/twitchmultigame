@@ -90,21 +90,21 @@ export class GameController {
       return
     }
 
-    // correct_title or double_shot
-    if (ev.points > 0) {
-      const streak = this.streakIn.get(ev.viewerUsername) ?? 0
-      const mult = 1 + STREAK_STEP * streak
-      const final = Math.round(ev.points * mult * 10) / 10
-      score.points += final
-      this.found = true
-      this.roundFound.add(ev.viewerUsername)
-      const tag = ev.reason === 'double_shot' ? ' (double-shot 🎯)' : ''
-      const streakTag = streak > 0 ? ` 🔥x${(1 + STREAK_STEP * streak).toFixed(2)}` : ''
-      this.pushFeed('found', `${score.displayName} +${final}${tag}${streakTag}`)
-    } else {
-      // Failed double-shot: guess consumed, no points.
-      this.pushFeed('system', `${score.displayName} double-shot raté`)
-    }
+    // correct_title | correct_artist | combo — all positive main-guess points.
+    const streak = this.streakIn.get(ev.viewerUsername) ?? 0
+    const mult = 1 + STREAK_STEP * streak
+    const final = Math.round(ev.points * mult * 10) / 10
+    score.points += final
+    this.found = true
+    this.roundFound.add(ev.viewerUsername)
+    const tag =
+      ev.reason === 'combo'
+        ? ' (combo 🎯)'
+        : ev.reason === 'correct_artist'
+          ? ' (artiste 🎸)'
+          : ''
+    const streakTag = streak > 0 ? ` 🔥x${mult.toFixed(2)}` : ''
+    this.pushFeed('found', `${score.displayName} +${final}${tag}${streakTag}`)
     this.emit()
   }
 

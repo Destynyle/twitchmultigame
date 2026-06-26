@@ -17,7 +17,7 @@ export interface ScoringEvent {
   viewerUsername: string
   viewerDisplayName: string
   points: number  // can be negative for malus
-  reason: 'correct_title' | 'correct_artist' | 'correct_answer' | 'partial' | 'malus' | 'featuring' | 'double_shot'
+  reason: 'correct_title' | 'correct_artist' | 'correct_answer' | 'partial' | 'malus' | 'featuring' | 'double_shot' | 'combo'
   timestamp: Date
   streakMultiplier?: number
   elapsed_ms?: number

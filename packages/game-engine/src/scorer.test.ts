@@ -282,7 +282,7 @@ describe('malus trap terms (GAME-03)', () => {
   })
 })
 
-describe('double-shot v2 (GAME-04)', () => {
+describe('title/artist/combo v2', () => {
   let plugin: BlindtestPlugin
   const WINDOW_MS = 3000
 
@@ -293,64 +293,63 @@ describe('double-shot v2 (GAME-04)', () => {
     await plugin.onReveal(ctx)
   })
 
-  it('both title and artist correct in one message: (title_pts + artist_pts) x 2', async () => {
+  it('title + artist in one message (first finder): (3+3) x 1.5 = 9 pts, reason combo', async () => {
     const t0 = 1000000
     const event = await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody Queen', 'viewer1', t0))
     expect(event).not.toBeNull()
-    // First finder: title_pts=3, artist_pts=3 → (3+3)x2 = 12
-    expect(event!.points).toBe(12)
-    expect(event!.reason).toBe('double_shot')
+    expect(event!.points).toBe(9)
+    expect(event!.reason).toBe('combo')
   })
 
-  it('first finder double-shot at t=0: (3+3) x 2 = 12 pts', async () => {
+  it('combo at t=1.5s (3s window): (2.0+2.0) x 1.5 = 6.0 pts', async () => {
     const t0 = 1000000
-    const event = await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody Queen', 'viewer1', t0))
-    expect(event!.points).toBe(12)
-    expect(event!.reason).toBe('double_shot')
-  })
-
-  it('double-shot at t=1.5s (3s window): (2.0+2.0) x 2 = 8.0 pts', async () => {
-    const t0 = 1000000
-    // First finder opens window
+    // viewer1 first finder opens BOTH windows at t0
     await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody Queen', 'viewer1', t0))
-    // Second viewer at t0+1500ms
+    // viewer2 combos at t0+1500ms → each target decays to 2.0
     const event = await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody Queen', 'viewer2', t0 + 1500))
-    expect(event).not.toBeNull()
-    expect(event!.points).toBe(8.0)
-    expect(event!.reason).toBe('double_shot')
+    expect(event!.points).toBe(6.0)
+    expect(event!.reason).toBe('combo')
   })
 
-  it('only title correct in double-shot attempt: 0 pts (all-or-nothing)', async () => {
+  it('title only: scores correct_title (3 pts first finder), not all-or-nothing', async () => {
     const event = await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody', 'viewer1'))
     expect(event).not.toBeNull()
-    expect(event!.points).toBe(0)
-    expect(event!.reason).toBe('double_shot')
+    expect(event!.points).toBe(3)
+    expect(event!.reason).toBe('correct_title')
   })
 
-  it('only artist correct in double-shot attempt: 0 pts', async () => {
+  it('artist only: scores correct_artist (3 pts first finder)', async () => {
     const event = await plugin.onChatMessage(ctx, msg('Queen', 'viewer1'))
     expect(event).not.toBeNull()
-    expect(event!.points).toBe(0)
-    expect(event!.reason).toBe('double_shot')
+    expect(event!.points).toBe(3)
+    expect(event!.reason).toBe('correct_artist')
   })
 
-  it('double-shot reason is "double_shot" not "correct_answer"', async () => {
+  it('title now, artist later (separate messages): 3 + 3 = 6, no combo bonus', async () => {
     const t0 = 1000000
-    const event = await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody Queen', 'viewer1', t0))
-    expect(event!.reason).toBe('double_shot')
-    expect(event!.reason).not.toBe('correct_answer')
+    const e1 = await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody', 'viewer1', t0))
+    expect(e1!.reason).toBe('correct_title')
+    expect(e1!.points).toBe(3)
+    // Artist target window is independent and still unopened → first finder = 3
+    const e2 = await plugin.onChatMessage(ctx, msg('Queen', 'viewer1', t0 + 1500))
+    expect(e2!.reason).toBe('correct_artist')
+    expect(e2!.points).toBe(3)
+    // Total 6 < combo first-finder 9 → combo is rewarded
   })
 
-  it('failed double-shot viewer cannot retry (answeredViewers)', async () => {
-    // Failed double-shot adds to answeredViewers
-    const first = await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody', 'viewer1'))
-    expect(first!.points).toBe(0)
-    // Second attempt should be null (already in answeredViewers)
-    const second = await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody Queen', 'viewer1'))
-    expect(second).toBeNull()
+  it('already scored title, then names both: only artist counts (no combo)', async () => {
+    await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody', 'viewer1'))
+    const event = await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody Queen', 'viewer1'))
+    expect(event!.reason).toBe('correct_artist')
   })
 
-  it('title-only track (artist=null): title match scores as correct_title (no double-shot)', async () => {
+  it('each target scored once per viewer: repeating a found target returns null', async () => {
+    await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody Queen', 'viewer1'))
+    const repeat = await plugin.onChatMessage(ctx, msg('Bohemian Rhapsody Queen', 'viewer1'))
+    expect(repeat).toBeNull()
+  })
+
+  it('title-only track (artist=null): title match scores as correct_title', async () => {
     const p2 = new BlindtestPlugin()
     await p2.onSessionStart(ctx)
     p2.setCurrentTrack('Bohemian Rhapsody', null, { windowDurationMs: WINDOW_MS })

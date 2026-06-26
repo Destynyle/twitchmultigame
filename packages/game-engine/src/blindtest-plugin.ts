@@ -7,15 +7,22 @@ interface TrackOptions {
   windowDurationMs?: number
 }
 
+// Bonus multiplier when a viewer names BOTH title and artist in the SAME message
+// (harder/longer to type, so it's rewarded). Tunable.
+const COMBO_MULTIPLIER = 1.5
+
 interface TrackState {
   title: string
   artist: string | null
   featurings: string[]
   malusTerms: string[]
   windowDurationMs: number
-  /** Timestamp (ms) of the first correct title or double-shot guess */
-  windowOpenAt: number | null
-  answeredViewers: Set<string>       // viewers who used their main guess this round
+  // Title and artist are independent targets, each with its own decay window
+  // opened by the first viewer to find that specific target.
+  titleWindowAt: number | null
+  artistWindowAt: number | null
+  titleScorers: Set<string>          // viewers who already scored the title this round
+  artistScorers: Set<string>         // viewers who already scored the artist this round
   foundFeaturings: Set<string>       // featuring names already found this round
   malusCounters: Map<string, number> // viewerUsername → malus hit count this round
 }
@@ -82,8 +89,10 @@ export class BlindtestPlugin implements GamePlugin {
   async onReveal(_ctx: SessionContext): Promise<void> {
     if (this.trackState) {
       // Reset per-round tracking on each reveal
-      this.trackState.windowOpenAt = null
-      this.trackState.answeredViewers = new Set()
+      this.trackState.titleWindowAt = null
+      this.trackState.artistWindowAt = null
+      this.trackState.titleScorers = new Set()
+      this.trackState.artistScorers = new Set()
       this.trackState.foundFeaturings = new Set()
       this.trackState.malusCounters = new Map()
     }
@@ -104,20 +113,21 @@ export class BlindtestPlugin implements GamePlugin {
       featurings: options?.featurings ?? [],
       malusTerms: options?.malusTerms ?? [],
       windowDurationMs: options?.windowDurationMs ?? 5000,
-      windowOpenAt: null,
-      answeredViewers: new Set(),
+      titleWindowAt: null,
+      artistWindowAt: null,
+      titleScorers: new Set(),
+      artistScorers: new Set(),
       foundFeaturings: new Set(),
       malusCounters: new Map(),
     }
   }
 
   /**
-   * Returns the timestamp (ms) when the timing window opened (first correct guess),
-   * or null if no correct guess yet this round.
-   * Exposed for BotSession to compute timers externally if needed.
+   * Returns the timestamp (ms) when the title timing window opened (first correct
+   * title guess), or null if no correct title guess yet this round.
    */
   getWindowOpenAt(): number | null {
-    return this.trackState?.windowOpenAt ?? null
+    return this.trackState?.titleWindowAt ?? null
   }
 
   async onChatMessage(
@@ -145,11 +155,10 @@ export class BlindtestPlugin implements GamePlugin {
       }
     }
 
-    // ── 2. Main guess: each viewer gets one attempt per round ──────────────
-    if (!state.answeredViewers.has(viewerUsername)) {
-      const event = this.checkMainGuess(ctx, state, viewerUsername, viewerDisplayName, text, timestamp, guessMs)
-      if (event !== undefined) return event
-    }
+    // ── 2. Main guess: title and artist are independent targets ────────────
+    // A viewer can score each once; naming both in one message earns a combo.
+    const event = this.checkMainGuess(ctx, state, viewerUsername, viewerDisplayName, text, timestamp, guessMs)
+    if (event !== undefined) return event
 
     // ── 3. Featuring check (independent from main guess) ───────────────────
     // Viewers can score featurings even after guessing title/artist (or vice versa).
@@ -170,9 +179,13 @@ export class BlindtestPlugin implements GamePlugin {
   }
 
   /**
-   * Evaluates the viewer's main guess (title/artist or double-shot).
-   * Returns a ScoringEvent if the message matches, undefined to fall through (no match at all).
-   * Returns null if the window has closed for a correct guess.
+   * Evaluates the viewer's guess against the two independent targets (title and
+   * artist). Each target is scored once per viewer, with its own decay window.
+   * - Both newly matched in this message: (titlePts + artistPts) x COMBO_MULTIPLIER, reason='combo'
+   * - Only title newly matched: decayed points, reason='correct_title'
+   * - Only artist newly matched: decayed points, reason='correct_artist'
+   * - Text matched a target but its window is closed / already scored: null (consume, no fall-through)
+   * - No target text matched: undefined (fall through to featuring check)
    */
   private checkMainGuess(
     ctx: SessionContext,
@@ -186,102 +199,57 @@ export class BlindtestPlugin implements GamePlugin {
     const titleMatches = fuzzyMatch(text, state.title)
     const artistMatches = state.artist !== null ? fuzzyMatch(text, state.artist) : false
 
-    if (state.artist !== null) {
-      return this.checkDoubleShot(ctx, state, viewerUsername, viewerDisplayName, text, timestamp, guessMs, titleMatches, artistMatches)
-    } else {
-      return this.checkSingleTitle(ctx, state, viewerUsername, viewerDisplayName, timestamp, guessMs, titleMatches)
-    }
-  }
+    const wantTitle = titleMatches && !state.titleScorers.has(viewerUsername)
+    const wantArtist =
+      artistMatches && state.artist !== null && !state.artistScorers.has(viewerUsername)
 
-  /**
-   * Handles double-shot track (artist is non-null).
-   * - Both match: (titlePts + artistPts) x 2, reason='double_shot'
-   * - Only one matches: 0 pts, reason='double_shot' (all-or-nothing)
-   * - Neither matches: undefined (fall through to featuring check)
-   */
-  private checkDoubleShot(
-    ctx: SessionContext,
-    state: TrackState,
-    viewerUsername: string,
-    viewerDisplayName: string,
-    _text: string,
-    timestamp: Date,
-    guessMs: number,
-    titleMatches: boolean,
-    artistMatches: boolean
-  ): ScoringEvent | null | undefined {
-    if (titleMatches && artistMatches) {
-      const decay = computeDecayPoints(guessMs, state.windowOpenAt, state.windowDurationMs)
-      if (decay === null) {
-        // Window closed — ignore (do not add to answeredViewers)
-        return null
-      }
-      if (state.windowOpenAt === null) {
-        state.windowOpenAt = guessMs
-      }
-      const total = Math.round((decay.pts + decay.pts) * 2 * 10) / 10
-      state.answeredViewers.add(viewerUsername)
-      return {
-        sessionId: ctx.sessionId,
-        viewerUsername,
-        viewerDisplayName,
-        points: total,
-        reason: 'double_shot',
-        timestamp,
-        elapsed_ms: decay.elapsed_ms,
+    // No NEW target for this viewer: fall through to featuring only if the text
+    // matched nothing at all; otherwise consume silently (already scored / repeat).
+    if (!wantTitle && !wantArtist) {
+      return titleMatches || artistMatches ? null : undefined
+    }
+
+    let titlePts = 0
+    let artistPts = 0
+    let gotTitle = false
+    let gotArtist = false
+    let elapsed = 0
+
+    if (wantTitle) {
+      const decay = computeDecayPoints(guessMs, state.titleWindowAt, state.windowDurationMs)
+      if (decay !== null) {
+        if (state.titleWindowAt === null) state.titleWindowAt = guessMs
+        state.titleScorers.add(viewerUsername)
+        titlePts = decay.pts
+        gotTitle = true
+        elapsed = Math.max(elapsed, decay.elapsed_ms)
       }
     }
 
-    if (titleMatches || artistMatches) {
-      // Failed double-shot: consumed the guess, 0 pts
-      state.answeredViewers.add(viewerUsername)
-      return {
-        sessionId: ctx.sessionId,
-        viewerUsername,
-        viewerDisplayName,
-        points: 0,
-        reason: 'double_shot',
-        timestamp,
+    if (wantArtist) {
+      const decay = computeDecayPoints(guessMs, state.artistWindowAt, state.windowDurationMs)
+      if (decay !== null) {
+        if (state.artistWindowAt === null) state.artistWindowAt = guessMs
+        state.artistScorers.add(viewerUsername)
+        artistPts = decay.pts
+        gotArtist = true
+        elapsed = Math.max(elapsed, decay.elapsed_ms)
       }
     }
 
-    return undefined // no match — fall through
-  }
+    // Matched target text but every window was closed — ignore the guess.
+    if (!gotTitle && !gotArtist) return null
 
-  /**
-   * Handles single-target track (artist is null, title only).
-   * - Title matches: decayed points, reason='correct_title'
-   * - No match: undefined (fall through to featuring check)
-   */
-  private checkSingleTitle(
-    ctx: SessionContext,
-    state: TrackState,
-    viewerUsername: string,
-    viewerDisplayName: string,
-    timestamp: Date,
-    guessMs: number,
-    titleMatches: boolean
-  ): ScoringEvent | null | undefined {
-    if (!titleMatches) return undefined
+    const base = { sessionId: ctx.sessionId, viewerUsername, viewerDisplayName, timestamp }
 
-    const decay = computeDecayPoints(guessMs, state.windowOpenAt, state.windowDurationMs)
-    if (decay === null) {
-      // Window closed — ignore
-      return null
+    if (gotTitle && gotArtist) {
+      const total = Math.round((titlePts + artistPts) * COMBO_MULTIPLIER * 10) / 10
+      return { ...base, points: total, reason: 'combo', elapsed_ms: elapsed }
     }
-    if (state.windowOpenAt === null) {
-      state.windowOpenAt = guessMs
+    if (gotTitle) {
+      return { ...base, points: titlePts, reason: 'correct_title', elapsed_ms: elapsed }
     }
-    state.answeredViewers.add(viewerUsername)
-    return {
-      sessionId: ctx.sessionId,
-      viewerUsername,
-      viewerDisplayName,
-      points: decay.pts,
-      reason: 'correct_title',
-      timestamp,
-      elapsed_ms: decay.elapsed_ms,
-    }
+    return { ...base, points: artistPts, reason: 'correct_artist', elapsed_ms: elapsed }
   }
 
   async onStreamerAction(_ctx: SessionContext, action: string, _payload?: unknown): Promise<void> {

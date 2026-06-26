@@ -73,7 +73,7 @@ export default function Control() {
             Manche {snap.trackIndex + 1}/{snap.trackTotal}
           </span>
           <a
-            href="/overlay"
+            href={`${import.meta.env.BASE_URL}overlay`}
             target="_blank"
             rel="noreferrer"
             className="ml-auto rounded-lg bg-white/10 px-3 py-1.5 hover:bg-white/20"

@@ -50,6 +50,7 @@ export default function Control() {
     return () => {
       reader.disconnect()
       pub.close()
+      ctrl.dispose()
     }
   }, [nav])
 

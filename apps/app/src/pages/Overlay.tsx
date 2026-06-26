@@ -39,10 +39,23 @@ export default function Overlay() {
         ) : (
           <div className="grid h-64 w-64 place-items-center rounded-2xl bg-white/5 text-6xl">🎵</div>
         )}
-        {revealed && snap.reveal && (
-          <div className="absolute bottom-6 rounded-xl bg-black/70 px-6 py-3 text-center backdrop-blur">
-            <div className="text-2xl font-bold">{snap.reveal.title}</div>
-            {snap.reveal.artist && <div className="text-white/70">{snap.reveal.artist}</div>}
+        {snap.status !== 'idle' && (
+          <div className="absolute inset-x-6 bottom-6 flex flex-col items-center gap-2">
+            <AnswerSlot label="Titre" value={snap.partial.title} big />
+            {snap.partial.hasArtist && <AnswerSlot label="Artiste" value={snap.partial.artist} />}
+            {snap.partial.featuringTotal > 0 && (
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <span className="text-[10px] uppercase tracking-wide text-white/40">feat.</span>
+                {snap.partial.featurings.map((f) => (
+                  <FeatChip key={f} name={f} />
+                ))}
+                {Array.from({
+                  length: snap.partial.featuringTotal - snap.partial.featurings.length,
+                }).map((_, i) => (
+                  <FeatChip key={`masked-${i}`} />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -60,5 +73,33 @@ export default function Overlay() {
         </div>
       </div>
     </div>
+  )
+}
+
+/** One answer line: shows the value once revealed, masked dots until then. */
+function AnswerSlot({ label, value, big }: { label: string; value: string | null; big?: boolean }) {
+  const size = big ? 'text-2xl' : 'text-lg'
+  return (
+    <div className="flex items-center gap-3 rounded-xl bg-black/70 px-4 py-2 backdrop-blur">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-white/40">{label}</span>
+      {value ? (
+        <span className={`font-bold text-white ${size}`}>{value}</span>
+      ) : (
+        <span className={`select-none font-bold tracking-[0.3em] text-white/25 ${size}`}>••••••</span>
+      )}
+    </div>
+  )
+}
+
+/** A featuring chip: green with the name once found, masked otherwise. */
+function FeatChip({ name }: { name?: string }) {
+  return name ? (
+    <span className="rounded-full bg-emerald-500/80 px-3 py-1 text-sm font-medium text-white">
+      {name}
+    </span>
+  ) : (
+    <span className="select-none rounded-full bg-white/10 px-3 py-1 text-sm tracking-widest text-white/25">
+      •••
+    </span>
   )
 }

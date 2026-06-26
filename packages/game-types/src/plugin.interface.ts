@@ -21,6 +21,8 @@ export interface ScoringEvent {
   timestamp: Date
   streakMultiplier?: number
   elapsed_ms?: number
+  /** Human label for the matched item (e.g. the featuring name that was found) */
+  label?: string
 }
 
 export interface GamePlugin {

@@ -33,6 +33,14 @@ export class GameController {
   private found = false
   private feed: FeedEvent[] = []
 
+  // Progressive overlay reveal: title/artist appear when their 5s window closes,
+  // featurings as soon as they are found.
+  private revealTitle = false
+  private revealArtist = false
+  private revealedFeats: string[] = []
+  private titleTimer: ReturnType<typeof setTimeout> | null = null
+  private artistTimer: ReturnType<typeof setTimeout> | null = null
+
   constructor(tracks: Track[], channel: string, onChange: (snap: GameSnapshot) => void) {
     this.tracks = tracks
     this.channel = channel
@@ -44,6 +52,36 @@ export class GameController {
     return this.tracks[this.index] ?? null
   }
 
+  private get windowMs(): number {
+    return this.currentTrack?.windowMs ?? 5000
+  }
+
+  /** Reveal a target on the overlay once its scoring window closes. */
+  private scheduleReveal(target: 'title' | 'artist'): void {
+    if (target === 'title') {
+      if (this.titleTimer || this.revealTitle) return
+      this.titleTimer = setTimeout(() => {
+        this.titleTimer = null
+        this.revealTitle = true
+        this.emit()
+      }, this.windowMs)
+    } else {
+      if (this.artistTimer || this.revealArtist) return
+      this.artistTimer = setTimeout(() => {
+        this.artistTimer = null
+        this.revealArtist = true
+        this.emit()
+      }, this.windowMs)
+    }
+  }
+
+  private clearTimers(): void {
+    if (this.titleTimer) clearTimeout(this.titleTimer)
+    if (this.artistTimer) clearTimeout(this.artistTimer)
+    this.titleTimer = null
+    this.artistTimer = null
+  }
+
   async startRound(): Promise<void> {
     const track = this.currentTrack
     if (!track) return
@@ -51,6 +89,10 @@ export class GameController {
     this.found = false
     this.roundFound.clear()
     this.roundMalus.clear()
+    this.clearTimers()
+    this.revealTitle = false
+    this.revealArtist = false
+    this.revealedFeats = []
     this.plugin.setCurrentTrack(track.title, track.artist, {
       featurings: track.featurings,
       malusTerms: track.malusTerms,
@@ -85,6 +127,7 @@ export class GameController {
 
     if (ev.reason === 'featuring') {
       score.points += ev.points
+      if (ev.label && !this.revealedFeats.includes(ev.label)) this.revealedFeats.push(ev.label)
       this.pushFeed('featuring', `${score.displayName} +${ev.points} (feat 🎤)`)
       this.emit()
       return
@@ -105,12 +148,25 @@ export class GameController {
           : ''
     const streakTag = streak > 0 ? ` 🔥x${mult.toFixed(2)}` : ''
     this.pushFeed('found', `${score.displayName} +${final}${tag}${streakTag}`)
+    // Open the reveal countdown for each target the first finder just claimed.
+    if (ev.reason === 'correct_title' || ev.reason === 'combo') this.scheduleReveal('title')
+    if (ev.reason === 'correct_artist' || ev.reason === 'combo') this.scheduleReveal('artist')
     this.emit()
   }
 
   async reveal(): Promise<void> {
     if (this.status === 'idle' && !this.currentTrack) return
     this.status = 'revealed'
+    // Manual reveal exposes everything immediately.
+    this.clearTimers()
+    this.revealTitle = true
+    this.revealArtist = true
+    const cur = this.currentTrack
+    if (cur) {
+      for (const f of cur.featurings) {
+        if (!this.revealedFeats.includes(f)) this.revealedFeats.push(f)
+      }
+    }
     // Round-end streak resolution.
     for (const u of this.roundFound) {
       this.streakIn.set(u, (this.streakIn.get(u) ?? 0) + 1)
@@ -131,6 +187,10 @@ export class GameController {
   }
 
   next(): void {
+    this.clearTimers()
+    this.revealTitle = false
+    this.revealArtist = false
+    this.revealedFeats = []
     if (this.index < this.tracks.length - 1) {
       this.index += 1
       this.status = 'idle'
@@ -140,6 +200,11 @@ export class GameController {
       this.pushFeed('system', 'Fin de la playlist 🏁')
     }
     this.emit()
+  }
+
+  /** Stop pending reveal timers (call when the control page unmounts). */
+  dispose(): void {
+    this.clearTimers()
   }
 
   adjustScore(username: string, delta: number): void {
@@ -189,6 +254,13 @@ export class GameController {
         this.status === 'revealed' && t
           ? { title: t.title, artist: t.artist, featurings: t.featurings }
           : null,
+      partial: {
+        title: this.revealTitle && t ? t.title : null,
+        artist: this.revealArtist && t ? t.artist : null,
+        hasArtist: !!t?.artist,
+        featurings: this.revealedFeats,
+        featuringTotal: t?.featurings.length ?? 0,
+      },
       coverUrl: t ? (t.coverUrl ?? coverUrl(t.source)) : null,
       found: this.found,
       leaderboard: this.leaderboard(),

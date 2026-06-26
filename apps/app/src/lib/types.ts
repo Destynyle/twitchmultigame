@@ -51,6 +51,21 @@ export interface GameSnapshot {
   trackTotal: number
   /** Revealed answer (only populated when status === 'revealed') */
   reveal: { title: string; artist: string | null; featurings: string[] } | null
+  /**
+   * Progressive reveal for the overlay answer panel. Each field appears as its
+   * scoring window closes (title/artist) or as it is found (featurings), before
+   * the streamer manually reveals everything.
+   */
+  partial: {
+    title: string | null
+    artist: string | null
+    /** Whether this track even has an artist target (drives a masked slot) */
+    hasArtist: boolean
+    /** Featurings already found (revealed immediately) */
+    featurings: string[]
+    /** Total featurings to find (for masked placeholder slots) */
+    featuringTotal: number
+  }
   coverUrl: string | null
   found: boolean
   leaderboard: ViewerScore[]

@@ -172,6 +172,7 @@ export class BlindtestPlugin implements GamePlugin {
         points: 1,
         reason: 'featuring',
         timestamp,
+        label: featMatch,
       }
     }
 

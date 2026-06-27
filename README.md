@@ -1,94 +1,89 @@
-# Playground
+# Blindtest
 
-Multi-tenant SaaS platform for Twitch chat-based mini-games. Streamers host blind tests, quizzes, and more directly from their dashboard.
+A zero-backend blind test game for Twitch streamers. Build a playlist, read your
+chat **anonymously** (no token, no login), and let viewers guess songs live —
+scoring, an OBS overlay, and animations all run **100% in the browser**.
 
-## Architecture
+🎮 Live: https://destynyle.github.io/twitchmultigame/
+Made by [destynyle_s](https://twitch.tv/destynyle_s).
 
-Turborepo monorepo with two runtimes:
+## How it works
 
-- `apps/web` — Next.js 15 App Router (dashboard, API, SSE overlays)
-- `apps/bot-worker` — Node.js TypeScript process (Twitch bot, game engine)
+- **No server, no database.** Everything runs client-side and persists to
+  `localStorage`. Hosting is a static bundle on GitHub Pages.
+- **Anonymous chat reading.** Connects to Twitch IRC over WebSocket as a
+  `justinfan` guest — no account or token needed to read a channel's chat.
+- **Music.** Paste YouTube/Spotify URLs, or import a Spotify playlist (your own
+  Spotify app, client-side PKCE). YouTube plays in full; Spotify plays a 30s
+  embed preview, or full songs via the **Spotify desktop app** (Connect mode).
+- **Overlay ↔ control sync** over `BroadcastChannel` (same browser, same PC) —
+  no server in between. Add the overlay as an OBS Browser Source.
 
-Shared packages:
+## Scoring
 
-- `packages/db` — Drizzle ORM schema + migrations
-- `packages/shared` — Zod env validation, constants, utility types
-- `packages/game-types` — Shared interfaces and DTOs
-- `packages/game-engine` — Game execution logic (bot-worker only)
-- `packages/eslint-config` — Shared ESLint + Prettier config
+- **Title** and **Artist** are independent targets, each with its own 5s decay
+  window (first finder gets the most, 3 → 1 over the window).
+- **Combo**: naming title **and** artist in the same message → `(title + artist) × 1.5`.
+- **Featuring**: +1 each, revealed on the overlay as soon as found.
+- **Malus**: forbidden terms cost points (−1, −2, −3…).
+- **Streak**: consecutive rounds with a find grow a multiplier.
 
-## Prerequisites
+## Stack
 
-- Node.js 20+
-- pnpm 9+
-- Docker + Docker Compose
+Turborepo monorepo:
 
-## Local Development
+- `apps/app` — Vite + React 18 + Tailwind CSS v4 SPA (the whole game)
+- `packages/game-engine` — pure scoring engine (`BlindtestPlugin`), framework-agnostic, tested with Vitest
+- `packages/game-types` — shared TypeScript interfaces
 
-### 1. Install dependencies
+## Local development
 
 ```bash
 pnpm install
-```
-
-### 2. Configure environment variables
-
-```bash
-cp .env.example .env.local
-```
-
-Edit `.env.local` and fill in all required values (see [Environment Variables](#environment-variables) below). The bot-worker and web server **will crash immediately** at startup if any required variable is missing — this is intentional.
-
-### 3. Start local services
-
-```bash
-docker-compose up -d
-```
-
-This starts PostgreSQL (port 5432) and Redis with AOF persistence (port 6379).
-
-### 4. Start development servers
-
-```bash
 pnpm dev
 ```
 
-- Next.js dev server: http://localhost:3000
-- bot-worker: starts and logs to stdout
-
-## Environment Variables
-
-All variables are required. The process crashes with a descriptive error if any is missing.
-
-| Variable | Description |
-|---|---|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `REDIS_URL` | Redis connection string |
-| `AUTH_SECRET` | Auth.js v5 secret (min 32 chars). Generate: `openssl rand -base64 32` |
-| `TOKEN_ENCRYPTION_KEY` | AES-256-GCM key — **exactly 64 hex characters**. Generate: `openssl rand -hex 32` |
-| `TWITCH_CLIENT_ID` | Twitch OAuth app client ID (from dev.twitch.tv) |
-| `TWITCH_CLIENT_SECRET` | Twitch OAuth app client secret |
-| `NODE_ENV` | `development` \| `test` \| `production` |
-
-## Railway Deployment
-
-Two Railway services required:
-
-| Service | Source | Environment variables |
-|---|---|---|
-| `web` | `apps/web/Dockerfile` | All 7 env vars above + any Railway-injected vars |
-| `bot-worker` | `apps/bot-worker/Dockerfile` | All 7 env vars above |
-
-Set `RAILWAY_TOKEN` in GitHub repository secrets to enable the deploy pipeline.
-
-## Scripts
+The dev server runs on **https://127.0.0.1:5173** (HTTPS on the loopback IP).
+This is required for OAuth: Spotify rejects the `localhost` hostname and Twitch
+requires HTTPS — only `https://127.0.0.1` satisfies both. Accept the self-signed
+certificate on first load.
 
 ```bash
-pnpm dev          # Start all services in dev mode
-pnpm build        # Build all packages
-pnpm test         # Run all tests via Turborepo
-pnpm type-check   # TypeScript check all packages
-pnpm lint         # Lint all packages
-pnpm db:generate  # Generate Drizzle migrations
-pnpm db:migrate   # Apply migrations
+pnpm build        # production build (apps/app → dist/, with SPA 404 fallback)
+pnpm test         # run the game-engine test suite
+pnpm type-check   # TypeScript check
+pnpm lint         # lint
 ```
+
+## OAuth setup (optional)
+
+Reading chat needs **nothing**. Only importing a Spotify playlist (and the
+optional Twitch login that auto-fills your channel name) needs a one-time setup,
+done with **your own** OAuth apps — there are no shared secrets in this repo.
+
+The exact **Redirect URI** to register is shown (with a copy button) in the app
+under **Connexions → Réglages**; it adapts automatically to dev
+(`https://127.0.0.1:5173/…`) and prod (`…github.io/…`). See the in-app **Guide**
+for the step-by-step. Spotify dev mode whitelists up to 25 accounts per app, so
+each player uses their own Spotify app.
+
+## Deployment (GitHub Pages)
+
+Pushing to `master` triggers `.github/workflows/deploy.yml` (build + deploy via
+GitHub Actions). One-time setup: repo **Settings → Pages → Source = GitHub
+Actions**.
+
+The Vite `base` is set to the repository name (`/twitchmultigame/` in
+`apps/app/vite.config.ts`) so assets and routes resolve under the project-site
+path. **If you fork/rename the repo, update `base` to match.**
+
+## Security notes
+
+Zero-backend keeps the attack surface small (no server, no DB, no stored PII;
+React escapes all chat/user text — no XSS sinks). The main residual considerations:
+
+- OAuth tokens live in `localStorage`. On GitHub Pages, all of a user's project
+  sites share the `*.github.io` origin (and thus `localStorage`) — a custom
+  domain isolates them.
+- OAuth uses PKCE (Spotify) / implicit with empty scope (Twitch login) — no
+  client secret is ever exposed.

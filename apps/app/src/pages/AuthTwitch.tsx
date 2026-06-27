@@ -10,13 +10,14 @@ export default function AuthTwitch() {
   useEffect(() => {
     // Implicit grant returns the token in the URL fragment.
     if (!window.location.hash) {
-      nav('/')
+      nav('/', { replace: true })
       return
     }
     completeTwitchAuth(window.location.hash)
       .then((login) => {
         saveChannel(login)
-        nav('/?twitch=connected')
+        // replace:true so the token-bearing fragment leaves no history entry.
+        nav('/?twitch=connected', { replace: true })
       })
       .catch((e) => setError((e as Error).message))
   }, [nav])

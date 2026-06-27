@@ -9,17 +9,19 @@ export default function AuthSpotify() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const code = params.get('code')
+    const state = params.get('state')
     const err = params.get('error')
     if (err) {
       setError(err)
       return
     }
     if (!code) {
-      nav('/')
+      nav('/', { replace: true })
       return
     }
-    completeSpotifyAuth(code)
-      .then(() => nav('/?spotify=connected'))
+    completeSpotifyAuth(code, state)
+      // replace:true so the URL holding the auth code leaves no history entry.
+      .then(() => nav('/?spotify=connected', { replace: true }))
       .catch((e) => setError((e as Error).message))
   }, [nav])
 

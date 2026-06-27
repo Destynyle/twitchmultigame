@@ -6,15 +6,25 @@ import { getTwitchClientId, twitchRedirectUri } from './connections'
 
 const AUTH_URL = 'https://id.twitch.tv/oauth2/authorize'
 const TOKEN_KEY = 'blindtest:twitchToken'
+const STATE_KEY = 'blindtest:twitchState'
+
+function randomState(): string {
+  const a = new Uint8Array(16)
+  crypto.getRandomValues(a)
+  return Array.from(a, (b) => ('0' + b.toString(16)).slice(-2)).join('')
+}
 
 export function beginTwitchAuth(): void {
   const clientId = getTwitchClientId()
   if (!clientId) throw new Error('Twitch client_id manquant (Réglages)')
+  const state = randomState()
+  localStorage.setItem(STATE_KEY, state)
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: twitchRedirectUri(),
     response_type: 'token',
     scope: '',
+    state,
   })
   window.location.href = `${AUTH_URL}?${params}`
 }
@@ -23,6 +33,11 @@ export function beginTwitchAuth(): void {
 // resolves the channel login, and persists it.
 export async function completeTwitchAuth(fragment: string): Promise<string> {
   const params = new URLSearchParams(fragment.replace(/^#/, ''))
+  const expected = localStorage.getItem(STATE_KEY)
+  localStorage.removeItem(STATE_KEY)
+  if (!expected || params.get('state') !== expected) {
+    throw new Error('État OAuth invalide (CSRF) — relance la connexion')
+  }
   const token = params.get('access_token')
   if (!token) throw new Error('Token Twitch absent')
   const res = await fetch('https://api.twitch.tv/helix/users', {

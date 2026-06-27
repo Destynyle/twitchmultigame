@@ -13,6 +13,7 @@ const SCOPES =
   'playlist-read-private playlist-read-collaborative user-modify-playback-state user-read-playback-state'
 const TOKEN_KEY = 'blindtest:spotifyToken'
 const VERIFIER_KEY = 'blindtest:spotifyVerifier'
+const STATE_KEY = 'blindtest:spotifyState'
 
 interface StoredToken {
   access_token: string
@@ -44,19 +45,25 @@ export async function beginSpotifyAuth(): Promise<void> {
   if (!clientId) throw new Error('Spotify client_id manquant (Réglages)')
   const verifier = randomString(64)
   localStorage.setItem(VERIFIER_KEY, verifier)
+  const state = randomString(16)
+  localStorage.setItem(STATE_KEY, state)
   const challenge = base64url(await sha256(verifier))
   const params = new URLSearchParams({
     client_id: clientId,
     response_type: 'code',
     redirect_uri: spotifyRedirectUri(),
     scope: SCOPES,
+    state,
     code_challenge_method: 'S256',
     code_challenge: challenge,
   })
   window.location.href = `${AUTH_URL}?${params}`
 }
 
-export async function completeSpotifyAuth(code: string): Promise<void> {
+export async function completeSpotifyAuth(code: string, state: string | null): Promise<void> {
+  const expected = localStorage.getItem(STATE_KEY)
+  localStorage.removeItem(STATE_KEY)
+  if (!expected || state !== expected) throw new Error('État OAuth invalide (CSRF) — relance la connexion')
   const verifier = localStorage.getItem(VERIFIER_KEY)
   if (!verifier) throw new Error('PKCE verifier introuvable')
   const body = new URLSearchParams({

@@ -49,3 +49,10 @@ coverage/
 # Repos imbriqués sans rapport (pas des submodules)
 blindtest/
 testbmad/
+
+# Tooling AI gardé en local mais hors versioning (untracked)
+_bmad/
+_bmad-output/
+.cursor/
+.agents/
+.planning/

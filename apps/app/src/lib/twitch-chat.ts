@@ -22,6 +22,13 @@ export class TwitchChatReader {
   private handlers: Handlers
   private closedByUser = false
   private reconnectDelay = 1000
+  private lastActivity = 0
+  private watchdog: ReturnType<typeof setInterval> | null = null
+
+  // Twitch sends a server PING every few minutes; we treat ANY inbound line as a
+  // liveness signal. If nothing arrives for this long the socket is silently dead
+  // (no close event) so we force a reconnect.
+  private static readonly STALE_MS = 360000
 
   constructor(channel: string, handlers: Handlers) {
     this.channel = channel.trim().toLowerCase().replace(/^#/, '')
@@ -45,10 +52,13 @@ export class TwitchChatReader {
       ws.send(`NICK ${nick}`)
       ws.send(`JOIN #${this.channel}`)
       this.reconnectDelay = 1000
+      this.lastActivity = Date.now()
+      this.startWatchdog()
       this.handlers.onStatus?.('connected')
     }
 
     ws.onmessage = (ev) => {
+      this.lastActivity = Date.now()
       const data = typeof ev.data === 'string' ? ev.data : ''
       for (const line of data.split('\r\n')) {
         if (!line) continue
@@ -62,6 +72,7 @@ export class TwitchChatReader {
     }
 
     ws.onclose = () => {
+      this.stopWatchdog()
       if (this.closedByUser) {
         this.handlers.onStatus?.('closed')
         return
@@ -77,8 +88,24 @@ export class TwitchChatReader {
     }
   }
 
+  private startWatchdog(): void {
+    this.stopWatchdog()
+    this.watchdog = setInterval(() => {
+      if (Date.now() - this.lastActivity > TwitchChatReader.STALE_MS) {
+        // Force a close → triggers the reconnect path in onclose.
+        this.ws?.close()
+      }
+    }, 30000)
+  }
+
+  private stopWatchdog(): void {
+    if (this.watchdog) clearInterval(this.watchdog)
+    this.watchdog = null
+  }
+
   disconnect(): void {
     this.closedByUser = true
+    this.stopWatchdog()
     this.ws?.close()
     this.ws = null
   }

@@ -5,6 +5,7 @@ import { TwitchChatReader } from '../lib/twitch-chat'
 import { createPublisher } from '../lib/sync'
 import { loadPlaylists, loadChannel, updateTrack, addTracksToPlaylist } from '../lib/storage'
 import { parseSource, fetchMeta } from '../lib/sources'
+import { applyTheme, getTheme } from '../lib/settings'
 import type { GameSnapshot, Playlist, Track } from '../lib/types'
 import { exportScoresJson, exportScoresCsv, exportPodiumPng } from '../lib/export'
 import Player from '../components/Player'
@@ -33,13 +34,16 @@ export default function Control() {
       return
     }
     activeIdRef.current = active.id
+    applyTheme(getTheme())
 
     const pub = createPublisher()
     pubRef.current = pub
-    const ctrl = new GameController(active.tracks, channel, (s) => {
+    const ctrl = new GameController(active.tracks, channel, active.id, (s) => {
       setSnap(s)
       pub.publish(s)
     })
+    // Restore an interrupted game (accidental reload) if it matches this channel+playlist.
+    ctrl.hydrate()
     ctrlRef.current = ctrl
     setSnap(ctrl.snapshot())
     pub.publish(ctrl.snapshot())
@@ -126,6 +130,16 @@ export default function Control() {
               ⏭ Suivant
             </button>
           </div>
+          <button
+            onClick={() => ctrl.toggleBonus()}
+            className={`mt-2 w-full rounded-lg py-2 text-sm font-semibold transition-all duration-150 hover:scale-[1.02] active:scale-100 ${
+              snap.bonus
+                ? 'bg-amber-400 text-black ring-2 ring-amber-200'
+                : 'bg-white/10 text-white/70 hover:bg-white/20'
+            }`}
+          >
+            {snap.bonus ? '✦ Manche bonus ×2 ACTIVE' : '✦ Activer manche bonus ×2'}
+          </button>
         </div>
 
         <AddSong
@@ -181,6 +195,14 @@ export default function Control() {
             className="rounded-lg bg-white/10 px-3 py-2 hover:bg-white/20"
           >
             Podium PNG
+          </button>
+          <button
+            onClick={() => {
+              if (confirm('Remettre tous les scores à zéro ?')) ctrl.resetGame()
+            }}
+            className="ml-auto rounded-lg bg-red-500/20 px-3 py-2 text-red-300 hover:bg-red-500/30"
+          >
+            Reset scores
           </button>
         </div>
       </div>

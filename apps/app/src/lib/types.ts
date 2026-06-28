@@ -70,6 +70,10 @@ export interface GameSnapshot {
   }
   coverUrl: string | null
   found: boolean
+  /** Live scoring window for the overlay countdown bar (null when not playing) */
+  round: { startedAt: number; windowMs: number } | null
+  /** Whether the current round awards double points */
+  bonus: boolean
   leaderboard: ViewerScore[]
   feed: FeedEvent[]
 }

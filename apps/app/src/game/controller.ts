@@ -3,6 +3,8 @@ import type { SessionContext, ChatMessage, ScoringEvent } from '@playground/game
 import type { Track, ViewerScore, FeedEvent, GameSnapshot, RoundStatus } from '../lib/types'
 import type { IncomingChat } from '../lib/twitch-chat'
 import { coverUrl } from '../lib/sources'
+import { getWindowMs } from '../lib/settings'
+import { saveSession, loadSession, clearSession } from '../lib/session'
 
 // Streak multiplier growth per consecutive found round. Tunable.
 const STREAK_STEP = 0.2
@@ -21,6 +23,7 @@ export class GameController {
   private plugin = new BlindtestPlugin()
   private tracks: Track[]
   private channel: string
+  private playlistId: string
   private onChange: (snap: GameSnapshot) => void
 
   private scores = new Map<string, ViewerScore>()
@@ -31,6 +34,8 @@ export class GameController {
   private index = 0
   private status: RoundStatus = 'idle'
   private found = false
+  private bonus = false               // current round awards double points
+  private roundStartedAt = 0          // for the overlay countdown bar
   private feed: FeedEvent[] = []
 
   // Progressive overlay reveal: title/artist appear when their 5s window closes,
@@ -41,11 +46,54 @@ export class GameController {
   private titleTimer: ReturnType<typeof setTimeout> | null = null
   private artistTimer: ReturnType<typeof setTimeout> | null = null
 
-  constructor(tracks: Track[], channel: string, onChange: (snap: GameSnapshot) => void) {
+  constructor(
+    tracks: Track[],
+    channel: string,
+    playlistId: string,
+    onChange: (snap: GameSnapshot) => void,
+  ) {
     this.tracks = tracks
     this.channel = channel
+    this.playlistId = playlistId
     this.onChange = onChange
     void this.plugin.onSessionStart(CTX)
+  }
+
+  /** Restore scores/feed/index from a saved session if it matches this game. */
+  hydrate(): boolean {
+    const s = loadSession()
+    if (!s || s.channel !== this.channel || s.playlistId !== this.playlistId) return false
+    this.scores = new Map(s.scores.map((v) => [v.username, v]))
+    this.streakIn = new Map(s.streakIn)
+    this.index = Math.min(s.index, Math.max(0, this.tracks.length - 1))
+    this.feed = s.feed
+    this.bonus = s.bonus
+    // Round-local state is intentionally dropped; the streamer re-opens the round.
+    this.status = 'idle'
+    this.found = false
+    // Keep the module feed counter ahead of restored ids to avoid key collisions.
+    const maxId = s.feed.reduce((m, e) => Math.max(m, Number(e.id.slice(1)) || 0), 0)
+    if (maxId >= feedSeq) feedSeq = maxId + 1
+    return true
+  }
+
+  /** Wipe scores and the persisted session (start a fresh game). */
+  resetGame(): void {
+    this.scores.clear()
+    this.streakIn.clear()
+    this.roundFound.clear()
+    this.roundMalus.clear()
+    this.feed = []
+    this.index = 0
+    this.status = 'idle'
+    this.found = false
+    this.bonus = false
+    this.clearTimers()
+    this.revealTitle = false
+    this.revealArtist = false
+    this.revealedFeats = []
+    clearSession()
+    this.emit()
   }
 
   get currentTrack(): Track | null {
@@ -53,7 +101,7 @@ export class GameController {
   }
 
   private get windowMs(): number {
-    return this.currentTrack?.windowMs ?? 5000
+    return this.currentTrack?.windowMs ?? getWindowMs()
   }
 
   /** Reveal a target on the overlay once its scoring window closes. */
@@ -87,6 +135,7 @@ export class GameController {
     if (!track) return
     this.status = 'playing'
     this.found = false
+    this.roundStartedAt = Date.now()
     this.roundFound.clear()
     this.roundMalus.clear()
     this.clearTimers()
@@ -96,9 +145,10 @@ export class GameController {
     this.plugin.setCurrentTrack(track.title, track.artist, {
       featurings: track.featurings,
       malusTerms: track.malusTerms,
-      ...(track.windowMs !== undefined ? { windowDurationMs: track.windowMs } : {}),
+      windowDurationMs: this.windowMs,
     })
-    this.pushFeed('system', `Manche ${this.index + 1} ouverte — à vous de deviner !`)
+    const bonusTag = this.bonus ? ' ✦ MANCHE BONUS ×2' : ''
+    this.pushFeed('system', `Manche ${this.index + 1} ouverte — à vous de deviner !${bonusTag}`)
     this.emit()
   }
 
@@ -125,10 +175,13 @@ export class GameController {
       return
     }
 
+    const bonusMult = this.bonus ? 2 : 1
+
     if (ev.reason === 'featuring') {
-      score.points += ev.points
+      const fpts = ev.points * bonusMult
+      score.points += fpts
       if (ev.label && !this.revealedFeats.includes(ev.label)) this.revealedFeats.push(ev.label)
-      this.pushFeed('featuring', `${score.displayName} +${ev.points} (feat 🎤)`, score.displayName)
+      this.pushFeed('featuring', `${score.displayName} +${fpts} (feat 🎤)`, score.displayName)
       this.emit()
       return
     }
@@ -136,7 +189,7 @@ export class GameController {
     // correct_title | correct_artist | combo — all positive main-guess points.
     const streak = this.streakIn.get(ev.viewerUsername) ?? 0
     const mult = 1 + STREAK_STEP * streak
-    const final = Math.round(ev.points * mult * 10) / 10
+    const final = Math.round(ev.points * mult * bonusMult * 10) / 10
     score.points += final
     this.found = true
     this.roundFound.add(ev.viewerUsername)
@@ -147,7 +200,8 @@ export class GameController {
           ? ' (artiste 🎸)'
           : ''
     const streakTag = streak > 0 ? ` 🔥x${mult.toFixed(2)}` : ''
-    this.pushFeed('found', `${score.displayName} +${final}${tag}${streakTag}`, score.displayName)
+    const bonusTag = this.bonus ? ' ✦x2' : ''
+    this.pushFeed('found', `${score.displayName} +${final}${tag}${streakTag}${bonusTag}`, score.displayName)
     // Open the reveal countdown for each target the first finder just claimed.
     if (ev.reason === 'correct_title' || ev.reason === 'combo') this.scheduleReveal('title')
     if (ev.reason === 'correct_artist' || ev.reason === 'combo') this.scheduleReveal('artist')
@@ -186,8 +240,15 @@ export class GameController {
     this.emit()
   }
 
+  /** Toggle double-points for the current/next round. */
+  toggleBonus(): void {
+    this.bonus = !this.bonus
+    this.emit()
+  }
+
   next(): void {
     this.clearTimers()
+    this.bonus = false
     this.revealTitle = false
     this.revealArtist = false
     this.revealedFeats = []
@@ -289,12 +350,31 @@ export class GameController {
       },
       coverUrl: t ? (t.coverUrl ?? coverUrl(t.source)) : null,
       found: this.found,
+      round:
+        this.status === 'playing'
+          ? { startedAt: this.roundStartedAt, windowMs: this.windowMs }
+          : null,
+      bonus: this.bonus,
       leaderboard: this.leaderboard(),
       feed: this.feed,
     }
   }
 
+  private persist(): void {
+    saveSession({
+      v: 1,
+      channel: this.channel,
+      playlistId: this.playlistId,
+      scores: [...this.scores.values()],
+      streakIn: [...this.streakIn.entries()],
+      index: this.index,
+      feed: this.feed,
+      bonus: this.bonus,
+    })
+  }
+
   private emit(): void {
+    this.persist()
     this.onChange(this.snapshot())
   }
 }

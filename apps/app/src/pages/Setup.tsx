@@ -10,6 +10,14 @@ import {
   parsePlaylistFile,
 } from '../lib/storage'
 import { parseSource, fetchMeta } from '../lib/sources'
+import {
+  getWindowMs,
+  setWindowMs,
+  THEMES,
+  getTheme,
+  setTheme,
+  applyTheme,
+} from '../lib/settings'
 import ConnectionsPanel from '../components/ConnectionsPanel'
 import Footer from '../components/Footer'
 
@@ -22,6 +30,8 @@ export default function Setup() {
   const [activeId, setActiveId] = useState<string>(() => localStorage.getItem(ACTIVE_KEY) || '')
   const [urlInput, setUrlInput] = useState('')
   const [error, setError] = useState('')
+  const [windowSec, setWindowSec] = useState(() => Math.round(getWindowMs() / 1000))
+  const [theme, setThemeState] = useState(getTheme)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const active = playlists.find((p) => p.id === activeId) ?? playlists[0]
@@ -32,6 +42,31 @@ export default function Setup() {
   useEffect(() => {
     if (active) localStorage.setItem(ACTIVE_KEY, active.id)
   }, [active])
+  useEffect(() => {
+    applyTheme(theme)
+  }, [theme])
+
+  function shuffleTracks() {
+    mutateActive((p) => {
+      const ts = [...p.tracks]
+      for (let i = ts.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[ts[i], ts[j]] = [ts[j]!, ts[i]!]
+      }
+      return { ...p, tracks: ts }
+    })
+  }
+
+  function moveTrack(id: string, dir: -1 | 1) {
+    mutateActive((p) => {
+      const i = p.tracks.findIndex((t) => t.id === id)
+      const j = i + dir
+      if (i < 0 || j < 0 || j >= p.tracks.length) return p
+      const ts = [...p.tracks]
+      ;[ts[i], ts[j]] = [ts[j]!, ts[i]!]
+      return { ...p, tracks: ts }
+    })
+  }
 
   function mutateActive(fn: (p: Playlist) => Playlist) {
     if (!active) return
@@ -127,6 +162,47 @@ export default function Setup() {
         />
       </section>
 
+      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-sm font-medium">
+            Fenêtre de réponse : {windowSec}s
+          </label>
+          <input
+            type="range"
+            min={2}
+            max={20}
+            value={windowSec}
+            onChange={(e) => {
+              const v = Number(e.target.value)
+              setWindowSec(v)
+              setWindowMs(v * 1000)
+            }}
+            className="w-full accent-indigo-400"
+          />
+          <p className="mt-1 text-xs text-white/40">
+            Durée où les points sont les plus élevés (3 → 1).
+          </p>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">Thème de l'overlay</label>
+          <select
+            value={theme}
+            onChange={(e) => {
+              setTheme(e.target.value)
+              setThemeState(e.target.value)
+            }}
+            className="w-full rounded-lg bg-white/5 px-3 py-2"
+          >
+            {THEMES.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.emoji} {t.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-white/40">Appliqué sur la page overlay (OBS).</p>
+        </div>
+      </section>
+
       <section className="mb-4 flex items-center gap-2">
         <select
           value={active?.id ?? ''}
@@ -156,6 +232,13 @@ export default function Setup() {
               className="rounded-lg bg-white/10 px-3 py-2 text-sm hover:bg-white/20"
             >
               Import
+            </button>
+            <button
+              onClick={shuffleTracks}
+              disabled={active.tracks.length < 2}
+              className="rounded-lg bg-white/10 px-3 py-2 text-sm hover:bg-white/20 disabled:opacity-30"
+            >
+              🔀 Mélanger
             </button>
             <input ref={fileRef} type="file" accept="application/json" hidden onChange={onImport} />
           </>
@@ -189,6 +272,22 @@ export default function Setup() {
                 <div className="mb-2 flex items-center gap-2 text-xs text-white/40">
                   <span>#{i + 1}</span>
                   <span className="rounded bg-white/10 px-1.5 py-0.5">{t.source.kind}</span>
+                  <button
+                    onClick={() => moveTrack(t.id, -1)}
+                    disabled={i === 0}
+                    className="rounded px-1 hover:text-white disabled:opacity-20"
+                    title="Monter"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    onClick={() => moveTrack(t.id, 1)}
+                    disabled={i === active.tracks.length - 1}
+                    className="rounded px-1 hover:text-white disabled:opacity-20"
+                    title="Descendre"
+                  >
+                    ▼
+                  </button>
                   <button onClick={() => deleteTrack(t.id)} className="ml-auto hover:text-red-400">
                     supprimer
                   </button>

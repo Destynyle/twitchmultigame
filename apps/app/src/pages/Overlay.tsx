@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createSubscriber } from '../lib/sync'
+import { applyTheme, getTheme } from '../lib/settings'
 import type { FeedKind, GameSnapshot } from '../lib/types'
 import Leaderboard from '../components/Leaderboard'
 import Feed from '../components/Feed'
@@ -25,6 +26,7 @@ export default function Overlay() {
 
   useEffect(() => {
     document.body.classList.add('overlay')
+    applyTheme(getTheme())
     const sub = createSubscriber(setSnap)
     return () => {
       document.body.classList.remove('overlay')
@@ -67,9 +69,26 @@ export default function Overlay() {
   const revealed = snap.status === 'revealed'
 
   return (
-    <div className="grid h-screen grid-cols-[1fr_320px] gap-4 p-4">
+    <div className="ov-root grid h-screen grid-cols-[1fr_320px] gap-4 p-4">
       {/* Player zone — heavily blurred cover until found (must be unrecognizable) */}
-      <div className="relative flex items-center justify-center overflow-hidden rounded-2xl">
+      <div className="ov-stage relative flex items-center justify-center overflow-hidden rounded-2xl">
+        {snap.round && !snap.found && (
+          <div className="absolute inset-x-6 top-6 z-10 h-2 overflow-hidden rounded-full bg-black/50">
+            <div
+              key={snap.round.startedAt}
+              className="ov-countdown h-full rounded-full"
+              style={{
+                animationDuration: `${snap.round.windowMs}ms`,
+                animationDelay: `-${Math.max(0, Date.now() - snap.round.startedAt)}ms`,
+              }}
+            />
+          </div>
+        )}
+        {snap.bonus && (
+          <div className="absolute top-4 right-6 z-10 animate-pulse rounded-full bg-amber-400 px-3 py-1 text-sm font-extrabold text-black shadow-lg">
+            ✦ BONUS ×2
+          </div>
+        )}
         {snap.coverUrl ? (
           <img
             src={snap.coverUrl}
@@ -106,13 +125,13 @@ export default function Overlay() {
 
       {/* Side: leaderboard + feed */}
       <div className="flex flex-col gap-4">
-        <div className="rounded-2xl bg-black/60 p-4 backdrop-blur">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/40">
+        <div className="ov-panel rounded-2xl p-4 backdrop-blur">
+          <h3 className="ov-accent mb-2 text-xs font-semibold uppercase tracking-wide">
             Classement
           </h3>
           <Leaderboard rows={snap.leaderboard.slice(0, 10)} />
         </div>
-        <div className="flex-1 overflow-hidden rounded-2xl bg-black/60 p-4 backdrop-blur">
+        <div className="ov-panel flex-1 overflow-hidden rounded-2xl p-4 backdrop-blur">
           <Feed events={snap.feed.slice(0, 12)} />
         </div>
       </div>

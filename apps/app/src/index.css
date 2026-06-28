@@ -2,6 +2,18 @@
 
 :root {
   color-scheme: dark;
+  /* Overlay theme tokens (overridden per body[data-theme]) */
+  --ov-panel: rgb(0 0 0 / 0.6);
+  --ov-border: rgb(255 255 255 / 0.08);
+  --ov-accent: #34d399;
+  --ov-font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+body[data-theme='petit-prince'] {
+  --ov-panel: rgb(13 18 43 / 0.74);
+  --ov-border: rgb(244 197 66 / 0.4);
+  --ov-accent: #f4c542;
+  --ov-font: Georgia, 'Times New Roman', serif;
 }
 
 body {
@@ -35,4 +47,42 @@ body.overlay {
 .animate-fall {
   animation: popup-fall var(--fall-dur, 3.6s) cubic-bezier(0.45, 0, 0.55, 1) forwards;
   will-change: transform, opacity;
+}
+
+/* ─── Overlay theming ──────────────────────────────────────────────────────── */
+.ov-root {
+  font-family: var(--ov-font);
+}
+.ov-panel {
+  background: var(--ov-panel);
+  border: 1px solid var(--ov-border);
+}
+.ov-accent {
+  color: var(--ov-accent);
+}
+
+/* Scoring-window countdown bar (depletes left→right over the window duration) */
+@keyframes countdown-deplete {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+.ov-countdown {
+  background: var(--ov-accent);
+  transform-origin: left;
+  animation-name: countdown-deplete;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+/* Petit Prince: starry tint on the player stage. The overlay page itself stays
+   transparent for OBS; only the framed stage box gets the night-sky decoration. */
+body[data-theme='petit-prince'] .ov-stage {
+  background:
+    radial-gradient(2px 2px at 20% 30%, rgb(255 255 255 / 0.55), transparent),
+    radial-gradient(1px 1px at 72% 62%, rgb(255 255 255 / 0.4), transparent),
+    radial-gradient(1.5px 1.5px at 42% 82%, rgb(255 233 153 / 0.6), transparent),
+    radial-gradient(1px 1px at 85% 25%, rgb(255 255 255 / 0.35), transparent),
+    radial-gradient(1px 1px at 12% 70%, rgb(255 255 255 / 0.35), transparent),
+    radial-gradient(circle at 50% 45%, rgb(26 33 81 / 0.4), rgb(11 16 38 / 0.18));
+  box-shadow: inset 0 0 0 2px var(--ov-border);
 }

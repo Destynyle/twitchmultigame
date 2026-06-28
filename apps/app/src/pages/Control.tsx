@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { GameController } from '../game/controller'
 import { TwitchChatReader } from '../lib/twitch-chat'
 import { createPublisher } from '../lib/sync'
-import { loadPlaylists, loadChannel, updateTrack } from '../lib/storage'
+import { loadPlaylists, loadChannel, updateTrack, addTracksToPlaylist } from '../lib/storage'
+import { parseSource, fetchMeta } from '../lib/sources'
 import type { GameSnapshot, Playlist, Track } from '../lib/types'
 import { exportScoresJson, exportScoresCsv, exportPodiumPng } from '../lib/export'
 import Player from '../components/Player'
@@ -18,6 +19,7 @@ export default function Control() {
   const ctrlRef = useRef<GameController | null>(null)
   const pubRef = useRef<ReturnType<typeof createPublisher> | null>(null)
   const readerRef = useRef<TwitchChatReader | null>(null)
+  const activeIdRef = useRef<string | null>(null)
   const [snap, setSnap] = useState<GameSnapshot | null>(null)
   const [chatStatus, setChatStatus] = useState('connecting')
 
@@ -30,6 +32,7 @@ export default function Control() {
       nav('/')
       return
     }
+    activeIdRef.current = active.id
 
     const pub = createPublisher()
     pubRef.current = pub
@@ -124,6 +127,26 @@ export default function Control() {
             </button>
           </div>
         </div>
+
+        <AddSong
+          onAdd={async (input) => {
+            const source = parseSource(input)
+            if (!source) return 'URL YouTube/Spotify invalide'
+            const meta = await fetchMeta(source)
+            const newTrack: Track = {
+              id: crypto.randomUUID(),
+              title: meta.title ?? 'Sans titre',
+              artist: meta.artist ?? null,
+              featurings: [],
+              malusTerms: [],
+              source,
+              ...(meta.cover ? { coverUrl: meta.cover } : {}),
+            }
+            ctrl.addTracks([newTrack])
+            if (activeIdRef.current) addTracksToPlaylist(activeIdRef.current, [newTrack])
+            return null
+          }}
+        />
 
         {podium.length > 0 && (
           <div className="rounded-xl bg-white/5 p-4">
@@ -240,6 +263,46 @@ function CurrentTrackEditor({
           className={field}
         />
       </div>
+    </div>
+  )
+}
+
+/** Paste a YouTube/Spotify URL to append a track mid-game (scores preserved). */
+function AddSong({ onAdd }: { onAdd: (input: string) => Promise<string | null> }) {
+  const [url, setUrl] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const submit = async () => {
+    if (!url.trim() || busy) return
+    setBusy(true)
+    setError('')
+    const err = await onAdd(url.trim())
+    setBusy(false)
+    if (err) setError(err)
+    else setUrl('')
+  }
+
+  return (
+    <div className="rounded-xl bg-white/5 p-4">
+      <h3 className="mb-2 text-sm font-semibold text-white/60">Ajouter un son (en direct)</h3>
+      <div className="flex gap-2">
+        <input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && void submit()}
+          placeholder="Lien YouTube ou Spotify"
+          className="flex-1 rounded-lg bg-black/30 px-3 py-2 text-sm outline-none transition-colors focus:bg-black/50"
+        />
+        <button
+          onClick={() => void submit()}
+          disabled={busy || !url.trim()}
+          className="rounded-lg bg-white/10 px-4 py-2 text-sm font-medium transition-all duration-150 hover:enabled:scale-105 hover:enabled:bg-white/20 active:enabled:scale-95 disabled:opacity-30"
+        >
+          {busy ? '…' : '+ Ajouter'}
+        </button>
+      </div>
+      {error && <div className="mt-2 text-xs text-red-400">{error}</div>}
     </div>
   )
 }

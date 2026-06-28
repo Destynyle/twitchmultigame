@@ -43,6 +43,16 @@ export function updateTrack(
   if (changed) savePlaylists(playlists)
 }
 
+/** Append tracks to one playlist (by id) and persist. */
+export function addTracksToPlaylist(playlistId: string, tracks: Track[]): void {
+  if (tracks.length === 0) return
+  const playlists = loadPlaylists()
+  const p = playlists.find((pl) => pl.id === playlistId)
+  if (!p) return
+  p.tracks.push(...tracks)
+  savePlaylists(playlists)
+}
+
 export function loadChannel(): string {
   return localStorage.getItem(CHANNEL_KEY) ?? ''
 }

@@ -224,6 +224,15 @@ export class GameController {
     this.emit()
   }
 
+  /** Append tracks to the live playlist mid-game without touching scores. */
+  addTracks(tracks: Track[]): void {
+    if (tracks.length === 0) return
+    this.tracks.push(...tracks)
+    const label = tracks.length === 1 ? `« ${tracks[0]!.title} »` : `${tracks.length} pistes`
+    this.pushFeed('system', `Ajout à la playlist : ${label}`)
+    this.emit()
+  }
+
   adjustScore(username: string, delta: number): void {
     const s = this.scores.get(username)
     if (!s) return

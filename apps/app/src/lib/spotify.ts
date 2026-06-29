@@ -201,6 +201,25 @@ export async function fetchMyPlaylists(): Promise<SpotifyPlaylistRef[]> {
   return out
 }
 
+// Extract a playlist id from a pasted link/URI: open.spotify.com/playlist/<id>
+// or spotify:playlist:<id> (with optional ?si=… query).
+export function parsePlaylistId(input: string): string | null {
+  const m = input.trim().match(/playlist[/:]([A-Za-z0-9]{22})/)
+  return m ? m[1]! : null
+}
+
+// Import any (public or owned) playlist from a pasted link. Needs a connected
+// Spotify token even for public playlists — the Web API rejects anonymous reads.
+export async function importSpotifyPlaylistByLink(
+  input: string,
+): Promise<{ name: string; tracks: Track[] }> {
+  const id = parsePlaylistId(input)
+  if (!id) throw new Error('Lien playlist Spotify non reconnu')
+  const meta = await api<{ name: string }>(`/playlists/${id}?fields=name`)
+  const tracks = await importSpotifyPlaylist(id)
+  return { name: meta.name || 'Playlist Spotify', tracks }
+}
+
 export async function importSpotifyPlaylist(playlistId: string): Promise<Track[]> {
   const tracks: Track[] = []
   let url: string | null = `/playlists/${playlistId}/tracks?limit=100&fields=next,items(track(id,name,artists(name),album(images)))`

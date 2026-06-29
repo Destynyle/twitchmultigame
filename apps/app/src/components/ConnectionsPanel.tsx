@@ -15,6 +15,7 @@ import {
   disconnectSpotify,
   fetchMyPlaylists,
   importSpotifyPlaylist,
+  importSpotifyPlaylistByLink,
   getDevices,
   type SpotifyPlaylistRef,
 } from '../lib/spotify'
@@ -44,6 +45,7 @@ export default function ConnectionsPanel({
   const [mode, setMode] = useState<PlaybackMode>(getPlaybackMode())
   const [devices, setDevices] = useState<{ id: string; name: string }[] | null>(null)
   const [deviceId, setDeviceId] = useState(getSpotifyDevice()?.id ?? '')
+  const [linkInput, setLinkInput] = useState('')
 
   function changeMode(m: PlaybackMode) {
     setMode(m)
@@ -104,6 +106,20 @@ export default function ConnectionsPanel({
     }
   }
 
+  async function importLink() {
+    setError('')
+    setBusy(true)
+    try {
+      const { name, tracks } = await importSpotifyPlaylistByLink(linkInput)
+      onImport(name, tracks)
+      setLinkInput('')
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   function safe(fn: () => void) {
     try {
       fn()
@@ -150,6 +166,25 @@ export default function ConnectionsPanel({
           )}
         </div>
       </div>
+
+      {spotifyOn && (
+        <div className="mt-3 flex gap-2">
+          <input
+            value={linkInput}
+            onChange={(e) => setLinkInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && !busy && linkInput.trim() && importLink()}
+            placeholder="Colle un lien de playlist Spotify (publique ou perso)…"
+            className="flex-1 rounded-lg bg-black/30 px-3 py-2 text-sm outline-none focus:bg-black/50"
+          />
+          <button
+            onClick={importLink}
+            disabled={busy || !linkInput.trim()}
+            className="rounded-lg bg-[#1DB954]/80 px-4 py-2 text-sm text-black transition-all duration-150 hover:scale-105 hover:bg-[#1DB954] active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
+          >
+            Importer
+          </button>
+        </div>
+      )}
 
       {open && (
         <div className="mt-3 border-t border-white/10 pt-3">

@@ -220,6 +220,36 @@ export async function importSpotifyPlaylistByLink(
   return { name: meta.name || 'Playlist Spotify', tracks }
 }
 
+export interface SpotifyTrackHit {
+  trackId: string
+  title: string
+  artist: string | null
+  featurings: string[]
+  cover?: string
+}
+
+// Full-text track search (Battle mode resolves a chat `!add <name>` to a song
+// without anyone pasting a link — links get censored by Twitch moderation).
+// Search needs only a valid user token, no extra scope.
+export async function searchSpotifyTracks(query: string, limit = 5): Promise<SpotifyTrackHit[]> {
+  const q = query.trim()
+  if (!q) return []
+  const j = await api<{ tracks?: { items: any[] } }>(
+    `/search?q=${encodeURIComponent(q)}&type=track&limit=${limit}`,
+  )
+  return (j.tracks?.items ?? []).map((t: any): SpotifyTrackHit => {
+    const artists: string[] = (t.artists ?? []).map((a: any) => a.name)
+    const cover: string | undefined = t.album?.images?.[0]?.url
+    return {
+      trackId: t.id,
+      title: cleanTitle(t.name),
+      artist: artists[0] ?? null,
+      featurings: artists.slice(1),
+      ...(cover ? { cover } : {}),
+    }
+  })
+}
+
 export async function importSpotifyPlaylist(playlistId: string): Promise<Track[]> {
   const tracks: Track[] = []
   let url: string | null = `/playlists/${playlistId}/tracks?limit=100&fields=next,items(track(id,name,artists(name),album(images)))`

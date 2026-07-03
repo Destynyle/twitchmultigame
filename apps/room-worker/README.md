@@ -15,7 +15,8 @@ npx wrangler login                       # ouvre le navigateur (compte Cloudflar
 npx wrangler secret put ROOM_PASSWORD    # mdp exigé à la création de room
 npx wrangler secret put SPOTIFY_CLIENT_ID
 npx wrangler secret put SPOTIFY_CLIENT_SECRET
-pnpm deploy                              # → https://battle-rooms.<compte>.workers.dev
+npx wrangler deploy                      # → https://battle-rooms.<compte>.workers.dev
+# (pas `pnpm deploy` — mot réservé pnpm)
 ```
 
 `SPOTIFY_CLIENT_ID`/`SECRET` : dans le [dashboard Spotify](https://developer.spotify.com/dashboard),

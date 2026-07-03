@@ -37,7 +37,9 @@ export type RoomEvent =
 
 // Deployed worker origin. Baked into the bundle so viewers (who configure
 // nothing) can reach the room. Overridable per-browser for dev via localStorage.
-const DEFAULT_WORKER_URL = (import.meta.env.VITE_ROOM_WORKER_URL as string | undefined) ?? ''
+const DEFAULT_WORKER_URL =
+  (import.meta.env.VITE_ROOM_WORKER_URL as string | undefined) ??
+  'https://battle-rooms.destysom01.workers.dev'
 const URL_KEY = 'battle:workerUrl'
 const CLIENT_KEY = 'room:clientId'
 const NAME_KEY = 'room:name'

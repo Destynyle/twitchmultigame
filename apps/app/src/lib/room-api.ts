@@ -1,6 +1,8 @@
 // Client for the battle room backend (apps/room-worker — Cloudflare Worker +
 // Durable Objects). Wire types mirror apps/room-worker/src/types.ts.
 
+import type { MusicSource } from './types'
+
 export interface RoomTrackHit {
   trackId: string
   title: string
@@ -8,9 +10,17 @@ export interface RoomTrackHit {
   cover?: string
 }
 
+/** A track a viewer is about to submit — Spotify search hit or pasted link. */
+export interface RoomPick {
+  source: MusicSource
+  title: string
+  artist: string | null
+  cover?: string
+}
+
 export interface RoomSubmission {
   id: string
-  trackId: string
+  source: MusicSource
   title: string
   artist: string | null
   cover?: string
@@ -105,12 +115,23 @@ export function searchRoom(code: string, q: string): Promise<{ hits: RoomTrackHi
 
 export function submitToRoom(
   code: string,
-  hit: RoomTrackHit,
+  pick: RoomPick,
   name: string,
 ): Promise<{ ok: true; count: number }> {
+  const id =
+    pick.source.kind === 'spotify'
+      ? { trackId: pick.source.trackId }
+      : { videoId: pick.source.videoId }
   return req(`/rooms/${code}/submit`, {
     method: 'POST',
-    body: JSON.stringify({ ...hit, name, clientId: roomClientId() }),
+    body: JSON.stringify({
+      ...id,
+      title: pick.title,
+      artist: pick.artist,
+      ...(pick.cover ? { cover: pick.cover } : {}),
+      name,
+      clientId: roomClientId(),
+    }),
   })
 }
 

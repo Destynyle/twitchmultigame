@@ -6,9 +6,14 @@ export interface RoomConfig {
   maxTotal: number
 }
 
+/** Same shape as the SPA's MusicSource — flows straight into the pool. */
+export type SubmissionSource =
+  | { kind: 'spotify'; trackId: string }
+  | { kind: 'youtube'; videoId: string }
+
 export interface RoomSubmission {
   id: string
-  trackId: string
+  source: SubmissionSource
   title: string
   artist: string | null
   cover?: string

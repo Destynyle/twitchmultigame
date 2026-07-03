@@ -7,9 +7,10 @@ import {
   searchRoom,
   setViewerName,
   submitToRoom,
-  type RoomTrackHit,
+  type RoomPick,
   type RoomView,
 } from '../lib/room-api'
+import { fetchMeta, parseSource } from '../lib/sources'
 
 // Public viewer page — no password gate: the room code IS the invitation
 // (shared on stream). Viewers pick a pseudo, search Spotify (proxied by the
@@ -101,7 +102,7 @@ export default function Room() {
 function SubmitPanel({ code, onSubmitted }: { code: string; onSubmitted: () => Promise<void> }) {
   const [name, setName] = useState(getViewerName)
   const [q, setQ] = useState('')
-  const [hits, setHits] = useState<RoomTrackHit[]>([])
+  const [hits, setHits] = useState<RoomPick[]>([])
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
 
@@ -110,7 +111,30 @@ function SubmitPanel({ code, onSubmitted }: { code: string; onSubmitted: () => P
     setBusy(true)
     setMsg('')
     try {
-      setHits((await searchRoom(code, q.trim())).hits)
+      // Pasted YouTube/Spotify link → resolve it directly (title via oEmbed,
+      // no key needed); anything else → Spotify text search via the worker.
+      const source = parseSource(q.trim())
+      if (source) {
+        const meta = await fetchMeta(source)
+        if (!meta.title) throw new Error('Lien reconnu mais vidéo/track introuvable')
+        setHits([
+          {
+            source,
+            title: meta.title,
+            artist: meta.artist ?? null,
+            ...(meta.cover ? { cover: meta.cover } : {}),
+          },
+        ])
+      } else {
+        setHits(
+          (await searchRoom(code, q.trim())).hits.map((h) => ({
+            source: { kind: 'spotify', trackId: h.trackId },
+            title: h.title,
+            artist: h.artist,
+            ...(h.cover ? { cover: h.cover } : {}),
+          })),
+        )
+      }
     } catch (e) {
       setMsg((e as Error).message)
       setHits([])
@@ -119,7 +143,7 @@ function SubmitPanel({ code, onSubmitted }: { code: string; onSubmitted: () => P
     }
   }
 
-  const submit = async (hit: RoomTrackHit) => {
+  const submit = async (hit: RoomPick) => {
     const pseudo = name.trim()
     if (!pseudo) {
       setMsg('Choisis un pseudo d’abord')
@@ -156,7 +180,7 @@ function SubmitPanel({ code, onSubmitted }: { code: string; onSubmitted: () => P
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void search()}
-          placeholder="Titre + artiste…"
+          placeholder="Titre + artiste… ou lien YouTube/Spotify"
           className="flex-1 rounded-lg bg-black/30 px-3 py-2 text-sm outline-none focus:bg-black/50"
         />
         <button
@@ -171,7 +195,7 @@ function SubmitPanel({ code, onSubmitted }: { code: string; onSubmitted: () => P
       {hits.length > 0 && (
         <ul className="mt-2 flex flex-col gap-1">
           {hits.map((h) => (
-            <li key={h.trackId}>
+            <li key={h.source.kind === 'spotify' ? h.source.trackId : h.source.videoId}>
               <button
                 onClick={() => void submit(h)}
                 disabled={busy}
@@ -179,7 +203,10 @@ function SubmitPanel({ code, onSubmitted }: { code: string; onSubmitted: () => P
               >
                 <Cover url={h.cover} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm">{h.title}</span>
+                  <span className="block truncate text-sm">
+                    {h.source.kind === 'youtube' && <span className="mr-1 text-xs">▶️</span>}
+                    {h.title}
+                  </span>
                   <span className="block truncate text-xs text-white/40">{h.artist ?? '—'}</span>
                 </span>
                 <span className="shrink-0 text-xs text-indigo-300">+ proposer</span>

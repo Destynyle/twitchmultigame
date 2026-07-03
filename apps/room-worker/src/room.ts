@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers'
 import { searchTracks } from './spotify'
-import type { Env, RoomConfig, RoomSubmission, RoomView } from './types'
+import type { Env, RoomConfig, RoomSubmission, RoomView, SubmissionSource } from './types'
 
 // One Durable Object = one ephemeral submission room. The streamer's admin tab
 // connects over WebSocket to receive submissions live; viewers use plain REST.
@@ -26,6 +26,13 @@ function sanitizeName(raw: unknown): string | null {
   if (typeof raw !== 'string') return null
   const name = raw.replace(/[\u0000-\u001f\u007f]/gu, "").trim().slice(0, 25)
   return name.length >= 1 ? name : null
+}
+
+// Album art / thumbnail hosts we accept — never an arbitrary viewer URL.
+const COVER_HOSTS = ['https://i.scdn.co/', 'https://i.ytimg.com/', 'https://img.youtube.com/']
+
+function subKey(s: SubmissionSource): string {
+  return s.kind === 'spotify' ? `sp:${s.trackId}` : `yt:${s.videoId}`
 }
 
 export class BattleRoom extends DurableObject<Env> {
@@ -144,27 +151,30 @@ export class BattleRoom extends DurableObject<Env> {
     const clientId = String(body.clientId ?? '').slice(0, 64)
     const name = sanitizeName(body.name)
     const trackId = String(body.trackId ?? '')
+    const videoId = String(body.videoId ?? '')
     const title = String(body.title ?? '').trim().slice(0, 120)
     const artist = body.artist == null ? null : String(body.artist).trim().slice(0, 120) || null
     const cover = String(body.cover ?? '')
     if (!clientId || !name || !title) return err('pseudo ou titre manquant', 400)
-    if (!/^[A-Za-z0-9]{22}$/.test(trackId)) return err('track invalide', 400)
+    let source: SubmissionSource
+    if (/^[A-Za-z0-9]{22}$/.test(trackId)) source = { kind: 'spotify', trackId }
+    else if (/^[A-Za-z0-9_-]{11}$/.test(videoId)) source = { kind: 'youtube', videoId }
+    else return err('track invalide', 400)
     if (!this.allow(clientId, 'submit', SUBMIT_PER_MIN)) return err('doucement — réessaie dans une minute', 429)
 
     const subs = await this.subs()
     if (subs.length >= meta.config.maxTotal) return err('room pleine', 409)
-    if (subs.some((s) => s.trackId === trackId)) return err('déjà proposé par quelqu’un', 409)
+    if (subs.some((s) => subKey(s.source) === subKey(source))) return err('déjà proposé par quelqu’un', 409)
     if (subs.filter((s) => s.clientId === clientId).length >= meta.config.maxPerUser) {
       return err(`limite atteinte (${meta.config.maxPerUser} max par personne)`, 409)
     }
 
     const sub: RoomSubmission = {
       id: crypto.randomUUID(),
-      trackId,
+      source,
       title,
       artist,
-      // Only Spotify's CDN — never store an arbitrary viewer-supplied URL.
-      ...(cover.startsWith('https://i.scdn.co/') ? { cover } : {}),
+      ...(COVER_HOSTS.some((h) => cover.startsWith(h)) ? { cover } : {}),
       name,
       clientId,
       at: Date.now(),

@@ -4,6 +4,7 @@ import { BattleController, type SubmissionResolver } from '../battle/controller'
 import { TwitchChatReader, TwitchChatSender, type SenderStatus } from '../lib/twitch-chat'
 import { getChatCredentials, needsChatReconnect } from '../lib/twitch-auth'
 import { PASSWORD as BATTLE_PASSWORD } from '../lib/battle-gate'
+import { fetchMeta, parseSource } from '../lib/sources'
 import {
   createRoom,
   getWorkerUrl,
@@ -75,7 +76,7 @@ function subToEntry(s: RoomSubmission): BattleEntry {
     id: crypto.randomUUID(),
     title: s.title,
     artist: s.artist,
-    source: { kind: 'spotify', trackId: s.trackId },
+    source: s.source,
     ...(s.cover ? { coverUrl: s.cover } : {}),
     submittedBy: s.name,
   }
@@ -443,16 +444,44 @@ function RoomPanel({
   )
 }
 
+interface AdminPick {
+  source: import('../lib/types').MusicSource
+  title: string
+  artist: string | null
+  cover?: string
+}
+
 function ManualAdd({ ctrl }: { ctrl: BattleController }) {
   const [q, setQ] = useState('')
-  const [hits, setHits] = useState<SpotifyTrackHit[]>([])
+  const [hits, setHits] = useState<AdminPick[]>([])
   const [busy, setBusy] = useState(false)
 
   const search = async () => {
     if (!q.trim() || busy) return
     setBusy(true)
     try {
-      setHits(await searchSpotifyTracks(q.trim(), 6))
+      // Pasted YouTube/Spotify link → resolve; free text → Spotify search.
+      const source = parseSource(q.trim())
+      if (source) {
+        const meta = await fetchMeta(source)
+        setHits([
+          {
+            source,
+            title: meta.title ?? 'Titre inconnu',
+            artist: meta.artist ?? null,
+            ...(meta.cover ? { cover: meta.cover } : {}),
+          },
+        ])
+      } else {
+        setHits(
+          (await searchSpotifyTracks(q.trim(), 6)).map((h) => ({
+            source: { kind: 'spotify', trackId: h.trackId },
+            title: h.title,
+            artist: h.artist,
+            ...(h.cover ? { cover: h.cover } : {}),
+          })),
+        )
+      }
     } catch {
       setHits([])
     } finally {
@@ -460,8 +489,15 @@ function ManualAdd({ ctrl }: { ctrl: BattleController }) {
     }
   }
 
-  const add = (h: SpotifyTrackHit) => {
-    const err = ctrl.addEntry(hitToEntry(h, 'admin'))
+  const add = (h: AdminPick) => {
+    const err = ctrl.addEntry({
+      id: crypto.randomUUID(),
+      title: h.title,
+      artist: h.artist,
+      source: h.source,
+      ...(h.cover ? { coverUrl: h.cover } : {}),
+      submittedBy: 'admin',
+    })
     if (err) alert(err)
     setHits([])
     setQ('')
@@ -475,7 +511,7 @@ function ManualAdd({ ctrl }: { ctrl: BattleController }) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void search()}
-          placeholder="Rechercher sur Spotify…"
+          placeholder="Rechercher sur Spotify… ou coller un lien YouTube/Spotify"
           className="flex-1 rounded-lg bg-black/30 px-3 py-2 text-sm outline-none focus:bg-black/50"
         />
         <button
@@ -489,14 +525,17 @@ function ManualAdd({ ctrl }: { ctrl: BattleController }) {
       {hits.length > 0 && (
         <ul className="mt-2 flex flex-col gap-1">
           {hits.map((h) => (
-            <li key={h.trackId}>
+            <li key={h.source.kind === 'spotify' ? h.source.trackId : h.source.videoId}>
               <button
                 onClick={() => add(h)}
                 className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-white/10"
               >
                 <Cover url={h.cover} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm">{h.title}</span>
+                  <span className="block truncate text-sm">
+                    {h.source.kind === 'youtube' && <span className="mr-1 text-xs">▶️</span>}
+                    {h.title}
+                  </span>
                   <span className="block truncate text-xs text-white/40">{h.artist ?? '—'}</span>
                 </span>
                 <span className="text-xs text-indigo-300">+ ajouter</span>

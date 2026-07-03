@@ -56,6 +56,11 @@ export default function BattleOverlay() {
           <div className="text-xl">
             Soumets ton son : <code className="rounded bg-white/10 px-2 py-1">!add nom du son</code>
           </div>
+          {snap.room && (
+            <div className="mt-3 text-lg">
+              ou sur <span className="ov-accent font-semibold">{stripProto(snap.room.url)}</span>
+            </div>
+          )}
           <div className="mt-4 text-sm text-white/50">{snap.pool.count} son(s) en lice</div>
         </div>
       </div>
@@ -143,6 +148,10 @@ export default function BattleOverlay() {
       </div>
     </div>
   )
+}
+
+function stripProto(url: string): string {
+  return url.replace(/^https?:\/\//, '')
 }
 
 function Side({

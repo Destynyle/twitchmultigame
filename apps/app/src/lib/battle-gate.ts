@@ -6,7 +6,10 @@
 // authorization would require a backend (deliberately avoided here).
 
 const KEY = 'battle:unlocked'
-const PASSWORD = 'desty'
+// Also sent as the room-creation password (worker checks it against its
+// ROOM_PASSWORD secret). Still shipped in the bundle, so still obscurity —
+// change the worker secret to something private to truly lock room creation.
+export const PASSWORD = 'desty'
 
 export function isBattleUnlocked(): boolean {
   return localStorage.getItem(KEY) === '1'

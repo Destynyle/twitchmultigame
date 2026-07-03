@@ -64,6 +64,8 @@ export class BattleController {
 
   // Optional chat feedback (needs the streamer's chat:edit token). Null = silent.
   private announce: ((text: string) => void) | null = null
+  // Web submission room (Cloudflare worker) — shown on the lobby overlay.
+  private room: { code: string; url: string } | null = null
   // Users already told they hit the per-user cap (avoid replying to every retry).
   private capWarned = new Set<string>()
 
@@ -80,6 +82,12 @@ export class BattleController {
   /** Wire (or unwire) chat feedback messages. */
   setAnnouncer(fn: ((text: string) => void) | null): void {
     this.announce = fn
+  }
+
+  /** Publish (or clear) the web room join info on the overlay. */
+  setRoom(room: { code: string; url: string } | null): void {
+    this.room = room
+    this.emit()
   }
 
   // ─── Config (lobby) ───────────────────────────────────────────────────────
@@ -350,6 +358,7 @@ export class BattleController {
       lastWinner: this.lastWinner,
       champion: this.phase === 'done' ? this.sideView(champ) : null,
       feed: this.feed,
+      room: this.phase === 'lobby' ? this.room : null,
     }
   }
 

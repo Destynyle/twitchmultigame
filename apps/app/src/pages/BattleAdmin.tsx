@@ -3,6 +3,16 @@ import { Link } from 'react-router-dom'
 import { BattleController, type SubmissionResolver } from '../battle/controller'
 import { TwitchChatReader, TwitchChatSender, type SenderStatus } from '../lib/twitch-chat'
 import { getChatCredentials, needsChatReconnect } from '../lib/twitch-auth'
+import { PASSWORD as BATTLE_PASSWORD } from '../lib/battle-gate'
+import {
+  createRoom,
+  getWorkerUrl,
+  openRoomSocket,
+  roomAdmin,
+  roomLink,
+  setWorkerUrl,
+  type RoomSubmission,
+} from '../lib/room-api'
 import { createBattlePublisher } from '../lib/battle-sync'
 import { loadChannel, saveChannel } from '../lib/storage'
 import { isSpotifyConnected, searchSpotifyTracks, type SpotifyTrackHit } from '../lib/spotify'
@@ -45,11 +55,40 @@ function ChannelPrompt({ onSet }: { onSet: (c: string) => void }) {
   )
 }
 
+// Active web room, persisted so an admin reload doesn't lose the adminKey.
+const ROOM_KEY = 'battle:activeRoom'
+interface ActiveRoom {
+  code: string
+  adminKey: string
+}
+function loadActiveRoom(): ActiveRoom | null {
+  try {
+    const raw = localStorage.getItem(ROOM_KEY)
+    return raw ? (JSON.parse(raw) as ActiveRoom) : null
+  } catch {
+    return null
+  }
+}
+
+function subToEntry(s: RoomSubmission): BattleEntry {
+  return {
+    id: crypto.randomUUID(),
+    title: s.title,
+    artist: s.artist,
+    source: { kind: 'spotify', trackId: s.trackId },
+    ...(s.cover ? { coverUrl: s.cover } : {}),
+    submittedBy: s.name,
+  }
+}
+
 function BattleRoom({ channel }: { channel: string }) {
   const ctrlRef = useRef<BattleController | null>(null)
   const [snap, setSnap] = useState<BattleSnapshot | null>(null)
   const [chatStatus, setChatStatus] = useState('connecting')
   const [senderStatus, setSenderStatus] = useState<SenderStatus | null>(null)
+  const [webRoom, setWebRoom] = useState<ActiveRoom | null>(loadActiveRoom)
+  const [roomStatus, setRoomStatus] = useState('')
+  const [roomOpen, setRoomOpen] = useState(true)
   const spotifyOn = isSpotifyConnected()
 
   useEffect(() => {
@@ -92,6 +131,69 @@ function BattleRoom({ channel }: { channel: string }) {
     }
   }, [channel])
 
+  // Web room: live submissions stream into the pool; join info goes on the overlay.
+  useEffect(() => {
+    const ctrl = ctrlRef.current
+    if (!webRoom || !ctrl) return
+    ctrl.setRoom({ code: webRoom.code, url: roomLink(webRoom.code) })
+    const sock = openRoomSocket(
+      webRoom.code,
+      webRoom.adminKey,
+      (ev) => {
+        const c = ctrlRef.current
+        if (!c) return
+        if (ev.type === 'state') {
+          setRoomOpen(ev.open)
+          for (const s of ev.subs) c.addEntry(subToEntry(s))
+        } else if (ev.type === 'submission') {
+          c.addEntry(subToEntry(ev.sub))
+        } else if (ev.type === 'open') {
+          setRoomOpen(ev.open)
+        } else if (ev.type === 'expired') {
+          localStorage.removeItem(ROOM_KEY)
+          setWebRoom(null)
+        }
+      },
+      (s) => setRoomStatus(s),
+    )
+    return () => {
+      sock.close()
+      ctrlRef.current?.setRoom(null)
+    }
+  }, [webRoom])
+
+  // Leaving the lobby (bracket seeded) closes web submissions automatically.
+  const phase = snap?.phase
+  useEffect(() => {
+    if (phase && phase !== 'lobby' && webRoom && roomOpen) {
+      setRoomOpen(false)
+      roomAdmin(webRoom.code, webRoom.adminKey, 'close').catch(() => {})
+    }
+  }, [phase, webRoom, roomOpen])
+
+  const openWebRoom = async () => {
+    const cfg = ctrlRef.current?.getConfig()
+    try {
+      const { code, adminKey } = await createRoom(BATTLE_PASSWORD, {
+        theme: cfg?.theme ?? '',
+        maxPerUser: cfg?.maxPerUser ?? 2,
+        maxTotal: cfg?.maxTotal ?? 16,
+      })
+      const room = { code, adminKey }
+      localStorage.setItem(ROOM_KEY, JSON.stringify(room))
+      setRoomOpen(true)
+      setWebRoom(room)
+    } catch (e) {
+      alert(`Création de room impossible : ${(e as Error).message}`)
+    }
+  }
+
+  const endWebRoom = () => {
+    if (webRoom) roomAdmin(webRoom.code, webRoom.adminKey, 'close').catch(() => {})
+    localStorage.removeItem(ROOM_KEY)
+    setWebRoom(null)
+  }
+
   const ctrl = ctrlRef.current
   if (!snap || !ctrl) return null
 
@@ -133,6 +235,21 @@ function BattleRoom({ channel }: { channel: string }) {
         </p>
       )}
 
+      {snap.phase === 'lobby' && (
+        <RoomPanel
+          room={webRoom}
+          status={roomStatus}
+          open={roomOpen}
+          onCreate={() => void openWebRoom()}
+          onToggle={() => {
+            if (!webRoom) return
+            const next = !roomOpen
+            setRoomOpen(next)
+            roomAdmin(webRoom.code, webRoom.adminKey, next ? 'reopen' : 'close').catch(() => {})
+          }}
+          onEnd={endWebRoom}
+        />
+      )}
       {snap.phase === 'lobby' && <Lobby ctrl={ctrl} spotifyOn={spotifyOn} />}
       {snap.phase === 'bracket' && <Match ctrl={ctrl} snap={snap} />}
       {snap.phase === 'done' && <Done ctrl={ctrl} snap={snap} />}
@@ -224,6 +341,105 @@ function Lobby({ ctrl, spotifyOn }: { ctrl: BattleController; spotifyOn: boolean
         </section>
       </div>
     </div>
+  )
+}
+
+// ─── Web room panel (Cloudflare worker rooms) ───────────────────────────────────
+function RoomPanel({
+  room,
+  status,
+  open,
+  onCreate,
+  onToggle,
+  onEnd,
+}: {
+  room: ActiveRoom | null
+  status: string
+  open: boolean
+  onCreate: () => void
+  onToggle: () => void
+  onEnd: () => void
+}) {
+  const [url, setUrl] = useState(getWorkerUrl)
+  const [copied, setCopied] = useState(false)
+
+  if (!getWorkerUrl()) {
+    return (
+      <section className="mb-4 rounded-xl bg-white/5 p-4">
+        <h2 className="mb-1 text-sm font-semibold text-white/60">🌐 Room web (option)</h2>
+        <p className="mb-2 text-xs text-white/40">
+          Les viewers soumettent depuis une page web (recherche + covers, sans passer par le chat).
+          Colle l'URL du worker Cloudflare déployé (<code>apps/room-worker</code>).
+        </p>
+        <div className="flex gap-2">
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://battle-rooms.xxx.workers.dev"
+            className="flex-1 rounded-lg bg-black/30 px-3 py-2 text-sm outline-none focus:bg-black/50"
+          />
+          <button
+            onClick={() => {
+              setWorkerUrl(url)
+              setUrl(getWorkerUrl())
+            }}
+            disabled={!url.trim()}
+            className="rounded-lg bg-white/10 px-4 py-2 text-sm hover:enabled:bg-white/20 disabled:opacity-30"
+          >
+            Enregistrer
+          </button>
+        </div>
+      </section>
+    )
+  }
+
+  if (!room) {
+    return (
+      <section className="mb-4 flex items-center gap-3 rounded-xl bg-white/5 p-4">
+        <div className="flex-1">
+          <h2 className="text-sm font-semibold text-white/60">🌐 Room web</h2>
+          <p className="text-xs text-white/40">
+            Ouvre une page de soumission pour les viewers (lien affiché sur l'overlay).
+          </p>
+        </div>
+        <button
+          onClick={onCreate}
+          className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium hover:bg-indigo-400"
+        >
+          Créer une room
+        </button>
+      </section>
+    )
+  }
+
+  const link = roomLink(room.code)
+  return (
+    <section className="mb-4 flex flex-wrap items-center gap-3 rounded-xl bg-white/5 p-4">
+      <div className="min-w-0 flex-1">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-white/60">
+          🌐 Room <span className="rounded bg-white/10 px-2 py-0.5 font-mono text-indigo-300">{room.code}</span>
+          <span className={`h-2 w-2 rounded-full ${status === 'connected' ? 'bg-green-400' : 'bg-amber-400'}`} />
+          {!open && <span className="text-xs text-amber-300">(fermée aux soumissions)</span>}
+        </h2>
+        <p className="truncate text-xs text-white/40">{link}</p>
+      </div>
+      <button
+        onClick={() => {
+          void navigator.clipboard.writeText(link)
+          setCopied(true)
+          setTimeout(() => setCopied(false), 1500)
+        }}
+        className="rounded-lg bg-white/10 px-3 py-2 text-sm hover:bg-white/20"
+      >
+        {copied ? '✓ copié' : 'Copier le lien'}
+      </button>
+      <button onClick={onToggle} className="rounded-lg bg-white/10 px-3 py-2 text-sm hover:bg-white/20">
+        {open ? 'Fermer' : 'Rouvrir'}
+      </button>
+      <button onClick={onEnd} className="rounded-lg px-3 py-2 text-sm text-white/40 hover:text-red-400">
+        Terminer
+      </button>
+    </section>
   )
 }
 

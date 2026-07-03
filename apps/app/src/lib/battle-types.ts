@@ -70,6 +70,8 @@ export interface BattleSnapshot {
   lastWinner: 'a' | 'b' | null
   champion: BattleSideView | null
   feed: BattleVoteFeed[]
+  /** Web submission room, when one is open (shown on the lobby overlay). */
+  room: { code: string; url: string } | null
 }
 
 /** Persisted battle state (survives an accidental admin reload). */

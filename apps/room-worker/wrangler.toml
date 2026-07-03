@@ -1,0 +1,14 @@
+# Battle room backend — one Durable Object per room.
+# Secrets (wrangler secret put …): ROOM_PASSWORD, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
+name = "battle-rooms"
+main = "src/index.ts"
+compatibility_date = "2026-06-01"
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "BattleRoom"
+
+# SQLite-backed DO classes — required on the free plan.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["BattleRoom"]

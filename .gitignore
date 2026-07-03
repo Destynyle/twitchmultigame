@@ -56,3 +56,5 @@ _bmad-output/
 .cursor/
 .agents/
 .planning/
+.dev.vars
+.wrangler/

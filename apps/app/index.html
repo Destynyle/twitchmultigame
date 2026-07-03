@@ -17,7 +17,7 @@
                img-src 'self' data: https:;
                media-src 'self' https:;
                font-src 'self' data:;
-               connect-src 'self' https://api.spotify.com https://accounts.spotify.com https://open.spotify.com https://api.twitch.tv https://id.twitch.tv https://www.youtube.com wss://irc-ws.chat.twitch.tv;
+               connect-src 'self' https://api.spotify.com https://accounts.spotify.com https://open.spotify.com https://api.twitch.tv https://id.twitch.tv https://www.youtube.com wss://irc-ws.chat.twitch.tv https://*.workers.dev wss://*.workers.dev http://127.0.0.1:8787 ws://127.0.0.1:8787;
                frame-src https://open.spotify.com https://www.youtube.com https://www.youtube-nocookie.com;
                object-src 'none';
                base-uri 'self';

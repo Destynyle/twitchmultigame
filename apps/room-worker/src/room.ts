@@ -35,10 +35,17 @@ function subKey(s: SubmissionSource): string {
   return s.kind === 'spotify' ? `sp:${s.trackId}` : `yt:${s.videoId}`
 }
 
+interface TwitchIdentity {
+  userId: string
+  displayName: string
+}
+
 export class BattleRoom extends DurableObject<Env> {
   // In-memory rate buckets (clientId → recent call timestamps). Lost on
   // hibernation/eviction, which only ever makes limits more permissive.
   private rate = new Map<string, number[]>()
+  // Validated Twitch tokens (token → identity), 5 min freshness.
+  private twitchCache = new Map<string, { id: TwitchIdentity; exp: number }>()
 
   private allow(clientId: string, op: string, perMin: number): boolean {
     const key = `${op}:${clientId}`
@@ -99,6 +106,7 @@ export class BattleRoom extends DurableObject<Env> {
         theme: String(body.config.theme ?? '').slice(0, 80),
         maxPerUser: Math.min(20, Math.max(1, Number(body.config.maxPerUser) || 2)),
         maxTotal: Math.min(64, Math.max(2, Number(body.config.maxTotal) || 16)),
+        requireTwitch: body.config.requireTwitch === true && !!this.env.TWITCH_CLIENT_ID,
       },
       open: true,
       createdAt: Date.now(),
@@ -120,6 +128,8 @@ export class BattleRoom extends DurableObject<Env> {
       maxPerUser: meta.config.maxPerUser,
       count: subs.length,
       maxTotal: meta.config.maxTotal,
+      twitchClientId: this.env.TWITCH_CLIENT_ID ?? null,
+      requireTwitch: meta.config.requireTwitch ?? false,
       mine: subs
         .filter((s) => s.clientId === clientId)
         .map(({ id, title, artist, cover }) => ({ id, title, artist, ...(cover ? { cover } : {}) })),
@@ -141,6 +151,36 @@ export class BattleRoom extends DurableObject<Env> {
     }
   }
 
+  /** Resolve a viewer's Twitch access token into a verified identity.
+   *  Returns null when the token is invalid/expired or minted for another app. */
+  private async validateTwitch(token: string): Promise<TwitchIdentity | null> {
+    const cached = this.twitchCache.get(token)
+    if (cached && Date.now() < cached.exp) return cached.id
+    const v = await fetch('https://id.twitch.tv/oauth2/validate', {
+      headers: { Authorization: `OAuth ${token}` },
+    })
+    if (!v.ok) return null
+    const j = (await v.json()) as { login?: string; user_id?: string; client_id?: string }
+    if (!j.user_id || !j.login) return null
+    if (this.env.TWITCH_CLIENT_ID && j.client_id !== this.env.TWITCH_CLIENT_ID) return null
+    // Display name (capitalization) is a separate Helix call — best-effort.
+    let displayName = j.login
+    try {
+      const u = await fetch('https://api.twitch.tv/helix/users', {
+        headers: { Authorization: `Bearer ${token}`, 'Client-Id': j.client_id! },
+      })
+      if (u.ok) {
+        const uj = (await u.json()) as { data?: { display_name?: string }[] }
+        displayName = uj.data?.[0]?.display_name || j.login
+      }
+    } catch {
+      // keep login
+    }
+    const id: TwitchIdentity = { userId: j.user_id, displayName }
+    this.twitchCache.set(token, { id, exp: Date.now() + 5 * 60000 })
+    return id
+  }
+
   private async submit(request: Request): Promise<Response> {
     const meta = await this.meta()
     if (!meta) return err('room introuvable ou expirée', 404)
@@ -149,23 +189,39 @@ export class BattleRoom extends DurableObject<Env> {
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
     if (!body) return err('requête invalide', 400)
     const clientId = String(body.clientId ?? '').slice(0, 64)
-    const name = sanitizeName(body.name)
     const trackId = String(body.trackId ?? '')
     const videoId = String(body.videoId ?? '')
     const title = String(body.title ?? '').trim().slice(0, 120)
     const artist = body.artist == null ? null : String(body.artist).trim().slice(0, 120) || null
     const cover = String(body.cover ?? '')
+
+    // Verified Twitch identity beats (and replaces) the self-chosen pseudo.
+    const twitchToken = String(body.twitchToken ?? '')
+    let twitch: TwitchIdentity | null = null
+    if (twitchToken) {
+      twitch = await this.validateTwitch(twitchToken)
+      if (!twitch) return err('session Twitch invalide — reconnecte-toi', 401)
+    }
+    if (meta.config.requireTwitch && !twitch) return err('connexion Twitch requise', 403)
+    const name = twitch ? sanitizeName(twitch.displayName) : sanitizeName(body.name)
+
     if (!clientId || !name || !title) return err('pseudo ou titre manquant', 400)
     let source: SubmissionSource
     if (/^[A-Za-z0-9]{22}$/.test(trackId)) source = { kind: 'spotify', trackId }
     else if (/^[A-Za-z0-9_-]{11}$/.test(videoId)) source = { kind: 'youtube', videoId }
     else return err('track invalide', 400)
-    if (!this.allow(clientId, 'submit', SUBMIT_PER_MIN)) return err('doucement — réessaie dans une minute', 429)
+    // Rate-limit and cap by Twitch account when verified (stronger than a
+    // per-browser id, which clearing localStorage resets).
+    const ownerKey = twitch ? `tw:${twitch.userId}` : clientId
+    if (!this.allow(ownerKey, 'submit', SUBMIT_PER_MIN)) return err('doucement — réessaie dans une minute', 429)
 
     const subs = await this.subs()
     if (subs.length >= meta.config.maxTotal) return err('room pleine', 409)
     if (subs.some((s) => subKey(s.source) === subKey(source))) return err('déjà proposé par quelqu’un', 409)
-    if (subs.filter((s) => s.clientId === clientId).length >= meta.config.maxPerUser) {
+    const mine = subs.filter((s) =>
+      twitch ? s.twitchId === twitch.userId : !s.twitchId && s.clientId === clientId,
+    )
+    if (mine.length >= meta.config.maxPerUser) {
       return err(`limite atteinte (${meta.config.maxPerUser} max par personne)`, 409)
     }
 
@@ -177,6 +233,7 @@ export class BattleRoom extends DurableObject<Env> {
       ...(COVER_HOSTS.some((h) => cover.startsWith(h)) ? { cover } : {}),
       name,
       clientId,
+      ...(twitch ? { twitchId: twitch.userId } : {}),
       at: Date.now(),
     }
     subs.push(sub)

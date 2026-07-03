@@ -4,6 +4,8 @@ export interface RoomConfig {
   theme: string
   maxPerUser: number
   maxTotal: number
+  /** Reject submissions without a verified Twitch session. */
+  requireTwitch: boolean
 }
 
 /** Same shape as the SPA's MusicSource — flows straight into the pool. */
@@ -17,10 +19,12 @@ export interface RoomSubmission {
   title: string
   artist: string | null
   cover?: string
-  /** Viewer-chosen display name. */
+  /** Display name — the verified Twitch name when a token was provided. */
   name: string
-  /** Anonymous browser id (per-user cap; not a real identity). */
+  /** Anonymous browser id (fallback per-user cap; not a real identity). */
   clientId: string
+  /** Twitch user id when the submission was made with a verified session. */
+  twitchId?: string
   at: number
 }
 
@@ -39,6 +43,9 @@ export interface RoomView {
   maxPerUser: number
   count: number
   maxTotal: number
+  /** Twitch app viewers authenticate against (null = Twitch login disabled). */
+  twitchClientId: string | null
+  requireTwitch: boolean
   /** Submissions made by the requesting clientId. */
   mine: Array<Pick<RoomSubmission, 'id' | 'title' | 'artist' | 'cover'>>
 }
@@ -48,4 +55,6 @@ export interface Env {
   ROOM_PASSWORD: string
   SPOTIFY_CLIENT_ID: string
   SPOTIFY_CLIENT_SECRET: string
+  /** Optional — enables viewer Twitch login on room pages. */
+  TWITCH_CLIENT_ID?: string
 }

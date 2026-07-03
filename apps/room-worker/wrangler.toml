@@ -1,5 +1,6 @@
 # Battle room backend — one Durable Object per room.
-# Secrets (wrangler secret put …): ROOM_PASSWORD, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
+# Secrets (wrangler secret put …): ROOM_PASSWORD, SPOTIFY_CLIENT_ID,
+# SPOTIFY_CLIENT_SECRET, TWITCH_CLIENT_ID (optionnel — login Twitch viewers)
 name = "battle-rooms"
 main = "src/index.ts"
 compatibility_date = "2026-06-01"

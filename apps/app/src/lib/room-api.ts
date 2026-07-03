@@ -36,6 +36,9 @@ export interface RoomView {
   maxPerUser: number
   count: number
   maxTotal: number
+  /** Twitch app viewers can log in with (null = Twitch login disabled). */
+  twitchClientId: string | null
+  requireTwitch: boolean
   mine: Array<Pick<RoomSubmission, 'id' | 'title' | 'artist' | 'cover'>>
 }
 
@@ -82,6 +85,42 @@ export function setViewerName(name: string): void {
   localStorage.setItem(NAME_KEY, name.trim())
 }
 
+// ─── Viewer Twitch session (verified server-side by the worker) ───────────────
+const TW_TOKEN_KEY = 'room:twitchToken'
+const TW_NAME_KEY = 'room:twitchName'
+/** CSRF state for the room-side Twitch login (also routes the callback). */
+export const TW_STATE_KEY = 'room:twitchState'
+
+export function getRoomTwitch(): { token: string; name: string } | null {
+  const token = localStorage.getItem(TW_TOKEN_KEY)
+  return token ? { token, name: localStorage.getItem(TW_NAME_KEY) ?? '' } : null
+}
+
+export function setRoomTwitch(token: string, name: string): void {
+  localStorage.setItem(TW_TOKEN_KEY, token)
+  localStorage.setItem(TW_NAME_KEY, name)
+}
+
+export function clearRoomTwitch(): void {
+  localStorage.removeItem(TW_TOKEN_KEY)
+  localStorage.removeItem(TW_NAME_KEY)
+}
+
+/** Send the viewer to Twitch's consent page; comes back via /auth/twitch. */
+export function beginRoomTwitchAuth(clientId: string, code: string, redirectUri: string): void {
+  const rand = crypto.getRandomValues(new Uint32Array(2)).join('')
+  const state = `room:${code}:${rand}`
+  localStorage.setItem(TW_STATE_KEY, state)
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: 'token',
+    scope: '',
+    state,
+  })
+  window.location.href = `https://id.twitch.tv/oauth2/authorize?${params}`
+}
+
 /** Shareable viewer URL for a room code. */
 export function roomLink(code: string): string {
   return `${window.location.origin}${import.meta.env.BASE_URL}room/${code}`
@@ -99,7 +138,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function createRoom(
   password: string,
-  config: { theme: string; maxPerUser: number; maxTotal: number },
+  config: { theme: string; maxPerUser: number; maxTotal: number; requireTwitch: boolean },
 ): Promise<{ code: string; adminKey: string }> {
   return req('/rooms', { method: 'POST', body: JSON.stringify({ password, config }) })
 }
@@ -122,6 +161,7 @@ export function submitToRoom(
     pick.source.kind === 'spotify'
       ? { trackId: pick.source.trackId }
       : { videoId: pick.source.videoId }
+  const twitch = getRoomTwitch()
   return req(`/rooms/${code}/submit`, {
     method: 'POST',
     body: JSON.stringify({
@@ -131,6 +171,7 @@ export function submitToRoom(
       ...(pick.cover ? { cover: pick.cover } : {}),
       name,
       clientId: roomClientId(),
+      ...(twitch ? { twitchToken: twitch.token } : {}),
     }),
   })
 }

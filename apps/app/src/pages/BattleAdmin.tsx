@@ -172,13 +172,14 @@ function BattleRoom({ channel }: { channel: string }) {
     }
   }, [phase, webRoom, roomOpen])
 
-  const openWebRoom = async () => {
+  const openWebRoom = async (requireTwitch: boolean) => {
     const cfg = ctrlRef.current?.getConfig()
     try {
       const { code, adminKey } = await createRoom(BATTLE_PASSWORD, {
         theme: cfg?.theme ?? '',
         maxPerUser: cfg?.maxPerUser ?? 2,
         maxTotal: cfg?.maxTotal ?? 16,
+        requireTwitch,
       })
       const room = { code, adminKey }
       localStorage.setItem(ROOM_KEY, JSON.stringify(room))
@@ -241,7 +242,7 @@ function BattleRoom({ channel }: { channel: string }) {
           room={webRoom}
           status={roomStatus}
           open={roomOpen}
-          onCreate={() => void openWebRoom()}
+          onCreate={(requireTwitch) => void openWebRoom(requireTwitch)}
           onToggle={() => {
             if (!webRoom) return
             const next = !roomOpen
@@ -357,12 +358,13 @@ function RoomPanel({
   room: ActiveRoom | null
   status: string
   open: boolean
-  onCreate: () => void
+  onCreate: (requireTwitch: boolean) => void
   onToggle: () => void
   onEnd: () => void
 }) {
   const [url, setUrl] = useState(getWorkerUrl)
   const [copied, setCopied] = useState(false)
+  const [requireTwitch, setRequireTwitch] = useState(false)
 
   if (!getWorkerUrl()) {
     return (
@@ -396,15 +398,23 @@ function RoomPanel({
 
   if (!room) {
     return (
-      <section className="mb-4 flex items-center gap-3 rounded-xl bg-white/5 p-4">
-        <div className="flex-1">
+      <section className="mb-4 flex flex-wrap items-center gap-3 rounded-xl bg-white/5 p-4">
+        <div className="min-w-48 flex-1">
           <h2 className="text-sm font-semibold text-white/60">🌐 Room web</h2>
           <p className="text-xs text-white/40">
             Ouvre une page de soumission pour les viewers (lien affiché sur l'overlay).
           </p>
         </div>
+        <label className="flex items-center gap-2 text-xs text-white/50">
+          <input
+            type="checkbox"
+            checked={requireTwitch}
+            onChange={(e) => setRequireTwitch(e.target.checked)}
+          />
+          Exiger la connexion Twitch (pseudos vérifiés)
+        </label>
         <button
-          onClick={onCreate}
+          onClick={() => onCreate(requireTwitch)}
           className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium hover:bg-indigo-400"
         >
           Créer une room

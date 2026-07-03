@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { applyTheme, getTheme } from '../lib/settings'
 import {
+  beginRoomTwitchAuth,
+  clearRoomTwitch,
   fetchRoom,
+  getRoomTwitch,
   getViewerName,
   searchRoom,
   setViewerName,
@@ -10,6 +13,7 @@ import {
   type RoomPick,
   type RoomView,
 } from '../lib/room-api'
+import { twitchRedirectUri } from '../lib/connections'
 import { fetchMeta, parseSource } from '../lib/sources'
 
 // Public viewer page — no password gate: the room code IS the invitation
@@ -88,7 +92,7 @@ export default function Room() {
       )}
 
       {view.open && view.mine.length < view.maxPerUser && (
-        <SubmitPanel code={roomCode} onSubmitted={refresh} />
+        <SubmitPanel code={roomCode} view={view} onSubmitted={refresh} />
       )}
       {view.open && view.mine.length >= view.maxPerUser && (
         <p className="rounded-lg bg-white/5 px-3 py-2 text-center text-sm text-white/50">
@@ -99,12 +103,33 @@ export default function Room() {
   )
 }
 
-function SubmitPanel({ code, onSubmitted }: { code: string; onSubmitted: () => Promise<void> }) {
+function SubmitPanel({
+  code,
+  view,
+  onSubmitted,
+}: {
+  code: string
+  view: RoomView
+  onSubmitted: () => Promise<void>
+}) {
   const [name, setName] = useState(getViewerName)
+  const [twitch, setTwitch] = useState(getRoomTwitch)
   const [q, setQ] = useState('')
   const [hits, setHits] = useState<RoomPick[]>([])
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
+
+  // Twitch required but not connected: only the login button makes sense.
+  if (view.requireTwitch && !twitch && view.twitchClientId) {
+    return (
+      <section className="rounded-xl bg-white/5 p-4 text-center">
+        <p className="mb-3 text-sm text-white/60">
+          Cette room demande une connexion Twitch (pseudo vérifié).
+        </p>
+        <TwitchButton onClick={() => beginRoomTwitchAuth(view.twitchClientId!, code, twitchRedirectUri())} />
+      </section>
+    )
+  }
 
   const search = async () => {
     if (!q.trim() || busy) return
@@ -144,12 +169,12 @@ function SubmitPanel({ code, onSubmitted }: { code: string; onSubmitted: () => P
   }
 
   const submit = async (hit: RoomPick) => {
-    const pseudo = name.trim()
+    const pseudo = twitch ? twitch.name : name.trim()
     if (!pseudo) {
       setMsg('Choisis un pseudo d’abord')
       return
     }
-    setViewerName(pseudo)
+    if (!twitch) setViewerName(pseudo)
     setBusy(true)
     try {
       await submitToRoom(code, hit, pseudo)
@@ -158,7 +183,13 @@ function SubmitPanel({ code, onSubmitted }: { code: string; onSubmitted: () => P
       setMsg('')
       await onSubmitted()
     } catch (e) {
-      setMsg((e as Error).message)
+      const m = (e as Error).message
+      // Expired viewer token — drop it so the login button reappears.
+      if (m.includes('session Twitch invalide')) {
+        clearRoomTwitch()
+        setTwitch(null)
+      }
+      setMsg(m)
     } finally {
       setBusy(false)
     }
@@ -166,14 +197,41 @@ function SubmitPanel({ code, onSubmitted }: { code: string; onSubmitted: () => P
 
   return (
     <section className="rounded-xl bg-white/5 p-3">
-      <label className="mb-1 block text-xs text-white/40">Ton pseudo</label>
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="ex: destyviewer"
-        maxLength={25}
-        className="mb-3 w-full rounded-lg bg-black/30 px-3 py-2 text-sm outline-none focus:bg-black/50"
-      />
+      {twitch ? (
+        <div className="mb-3 flex items-center gap-2 rounded-lg bg-[#9146FF]/15 px-3 py-2 text-sm">
+          <span className="text-[#bf94ff]">✓ Connecté :</span>
+          <span className="font-semibold">{twitch.name}</span>
+          <button
+            onClick={() => {
+              clearRoomTwitch()
+              setTwitch(null)
+            }}
+            className="ml-auto text-xs text-white/40 hover:text-white"
+          >
+            changer
+          </button>
+        </div>
+      ) : (
+        <>
+          {view.twitchClientId && (
+            <div className="mb-3">
+              <TwitchButton
+                onClick={() => beginRoomTwitchAuth(view.twitchClientId!, code, twitchRedirectUri())}
+              />
+            </div>
+          )}
+          <label className="mb-1 block text-xs text-white/40">
+            {view.twitchClientId ? 'ou choisis un pseudo' : 'Ton pseudo'}
+          </label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="ex: destyviewer"
+            maxLength={25}
+            className="mb-3 w-full rounded-lg bg-black/30 px-3 py-2 text-sm outline-none focus:bg-black/50"
+          />
+        </>
+      )}
       <label className="mb-1 block text-xs text-white/40">Propose un son</label>
       <div className="flex gap-2">
         <input
@@ -216,6 +274,17 @@ function SubmitPanel({ code, onSubmitted }: { code: string; onSubmitted: () => P
         </ul>
       )}
     </section>
+  )
+}
+
+function TwitchButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full rounded-lg bg-[#9146FF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#a05cff]"
+    >
+      Se connecter avec Twitch
+    </button>
   )
 }
 

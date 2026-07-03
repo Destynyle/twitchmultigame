@@ -50,8 +50,42 @@ export interface RoomView {
   mine: Array<Pick<RoomSubmission, 'id' | 'title' | 'artist' | 'cover'>>
 }
 
+// ─── Weekly blindtest ─────────────────────────────────────────────────────────
+
+/** One playable track, same shape the SPA's game engine consumes. */
+export interface WeeklyTrack {
+  title: string
+  artist: string | null
+  featurings: string[]
+  malusTerms: string[]
+  source: SubmissionSource
+  coverUrl?: string
+  windowMs?: number
+}
+
+export interface WeeklyWeek {
+  id: string
+  theme: string
+  tracks: WeeklyTrack[]
+  publishedAt: number
+}
+
+export interface WeeklyScore {
+  username: string
+  displayName: string
+  points: number
+}
+
+export interface ChannelResult {
+  channel: string
+  top: WeeklyScore[]
+  players: number
+  at: number
+}
+
 export interface Env {
   ROOMS: DurableObjectNamespace
+  WEEKLY: DurableObjectNamespace
   ROOM_PASSWORD: string
   SPOTIFY_CLIENT_ID: string
   SPOTIFY_CLIENT_SECRET: string

@@ -64,6 +64,11 @@ export function isTwitchConnected(): boolean {
   return !!localStorage.getItem(TOKEN_KEY)
 }
 
+/** Raw streamer token (any scopes) — enough for identity checks server-side. */
+export function getTwitchToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY)
+}
+
 export interface ChatCredentials {
   login: string
   token: string

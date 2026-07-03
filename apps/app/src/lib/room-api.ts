@@ -126,6 +126,11 @@ export function roomLink(code: string): string {
   return `${window.location.origin}${import.meta.env.BASE_URL}room/${code}`
 }
 
+/** Generic call against the deployed worker (shared with weekly-api). */
+export async function workerReq<T>(path: string, init?: RequestInit): Promise<T> {
+  return req(path, init)
+}
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const base = getWorkerUrl()
   if (!base) throw new Error('Room non configurée (URL du worker manquante)')

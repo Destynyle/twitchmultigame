@@ -20,6 +20,8 @@ import {
 } from '../lib/settings'
 import ConnectionsPanel from '../components/ConnectionsPanel'
 import Footer from '../components/Footer'
+import { isBattleUnlocked, PASSWORD as ADMIN_PASSWORD } from '../lib/battle-gate'
+import { publishWeekly } from '../lib/weekly-api'
 
 const ACTIVE_KEY = 'blindtest:activePlaylist'
 
@@ -138,13 +140,33 @@ export default function Setup() {
     nav('/control')
   }
 
+  // Admin-only (hidden behind the battle gate): push the active playlist as the
+  // new weekly blindtest. The worker re-checks the password server-side.
+  async function publishAsWeekly() {
+    if (!active || active.tracks.length < 2) return
+    const theme = window.prompt('Thème affiché pour la semaine ?', active.name)
+    if (theme === null) return
+    if (!window.confirm(`Remplacer le blindtest de la semaine par « ${active.name} » (${active.tracks.length} pistes) ? Les scores en cours seront remis à zéro.`)) return
+    try {
+      const r = await publishWeekly(ADMIN_PASSWORD, theme.trim(), active.tracks)
+      alert(`✅ Semaine publiée (${r.trackCount} pistes)`)
+    } catch (e) {
+      alert(`Échec : ${(e as Error).message}`)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-3xl p-6">
       <div className="mb-1 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Blindtest — Configuration</h1>
-        <Link to="/guide" className="text-sm text-indigo-400 hover:text-indigo-300">
-          Guide ↗
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link to="/weekly" className="text-sm text-amber-300 hover:text-amber-200">
+            📅 Blindtest de la semaine
+          </Link>
+          <Link to="/guide" className="text-sm text-indigo-400 hover:text-indigo-300">
+            Guide ↗
+          </Link>
+        </div>
       </div>
       <p className="mb-6 text-sm text-white/50">
         100% navigateur. Aucun compte, aucun token. Lecture du chat en anonyme.
@@ -240,6 +262,16 @@ export default function Setup() {
             >
               🔀 Mélanger
             </button>
+            {isBattleUnlocked() && (
+              <button
+                onClick={() => void publishAsWeekly()}
+                disabled={active.tracks.length < 2}
+                title="Publier cette playlist comme blindtest de la semaine (admin)"
+                className="rounded-lg bg-amber-500/20 px-3 py-2 text-sm text-amber-300 hover:bg-amber-500/30 disabled:opacity-30"
+              >
+                📅 Publier en hebdo
+              </button>
+            )}
             <input ref={fileRef} type="file" accept="application/json" hidden onChange={onImport} />
           </>
         )}

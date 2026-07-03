@@ -49,3 +49,7 @@ pnpm --filter @playground/room-worker dev   # http://127.0.0.1:8787
 | POST | `/rooms/:code/submit` | soumettre (cap/user, dédup, 5/min/client) |
 | POST | `/rooms/:code/admin` | `{key, action: close\|reopen\|remove, id?}` |
 | GET | `/rooms/:code/ws?key=` | WebSocket admin (state initial + events live) |
+| POST | `/weekly` | publier la semaine (body `{password, theme, tracks}`) |
+| GET | `/weekly` | semaine courante (pistes + réponses — modèle confiance) |
+| POST | `/weekly/results` | push du classement d'une chaîne (`{id, twitchToken, leaderboard}`) |
+| GET | `/weekly/leaderboard` | agrégat : top global (meilleur run par joueur) + par chaîne |

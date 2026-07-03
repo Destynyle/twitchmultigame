@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers'
 import { searchTracks } from './spotify'
+import { validateTwitchToken, type TwitchIdentity } from './twitch'
 import type { Env, RoomConfig, RoomSubmission, RoomView, SubmissionSource } from './types'
 
 // One Durable Object = one ephemeral submission room. The streamer's admin tab
@@ -35,17 +36,10 @@ function subKey(s: SubmissionSource): string {
   return s.kind === 'spotify' ? `sp:${s.trackId}` : `yt:${s.videoId}`
 }
 
-interface TwitchIdentity {
-  userId: string
-  displayName: string
-}
-
 export class BattleRoom extends DurableObject<Env> {
   // In-memory rate buckets (clientId → recent call timestamps). Lost on
   // hibernation/eviction, which only ever makes limits more permissive.
   private rate = new Map<string, number[]>()
-  // Validated Twitch tokens (token → identity), 5 min freshness.
-  private twitchCache = new Map<string, { id: TwitchIdentity; exp: number }>()
 
   private allow(clientId: string, op: string, perMin: number): boolean {
     const key = `${op}:${clientId}`
@@ -151,36 +145,6 @@ export class BattleRoom extends DurableObject<Env> {
     }
   }
 
-  /** Resolve a viewer's Twitch access token into a verified identity.
-   *  Returns null when the token is invalid/expired or minted for another app. */
-  private async validateTwitch(token: string): Promise<TwitchIdentity | null> {
-    const cached = this.twitchCache.get(token)
-    if (cached && Date.now() < cached.exp) return cached.id
-    const v = await fetch('https://id.twitch.tv/oauth2/validate', {
-      headers: { Authorization: `OAuth ${token}` },
-    })
-    if (!v.ok) return null
-    const j = (await v.json()) as { login?: string; user_id?: string; client_id?: string }
-    if (!j.user_id || !j.login) return null
-    if (this.env.TWITCH_CLIENT_ID && j.client_id !== this.env.TWITCH_CLIENT_ID) return null
-    // Display name (capitalization) is a separate Helix call — best-effort.
-    let displayName = j.login
-    try {
-      const u = await fetch('https://api.twitch.tv/helix/users', {
-        headers: { Authorization: `Bearer ${token}`, 'Client-Id': j.client_id! },
-      })
-      if (u.ok) {
-        const uj = (await u.json()) as { data?: { display_name?: string }[] }
-        displayName = uj.data?.[0]?.display_name || j.login
-      }
-    } catch {
-      // keep login
-    }
-    const id: TwitchIdentity = { userId: j.user_id, displayName }
-    this.twitchCache.set(token, { id, exp: Date.now() + 5 * 60000 })
-    return id
-  }
-
   private async submit(request: Request): Promise<Response> {
     const meta = await this.meta()
     if (!meta) return err('room introuvable ou expirée', 404)
@@ -199,7 +163,7 @@ export class BattleRoom extends DurableObject<Env> {
     const twitchToken = String(body.twitchToken ?? '')
     let twitch: TwitchIdentity | null = null
     if (twitchToken) {
-      twitch = await this.validateTwitch(twitchToken)
+      twitch = await validateTwitchToken(twitchToken, this.env.TWITCH_CLIENT_ID)
       if (!twitch) return err('session Twitch invalide — reconnecte-toi', 401)
     }
     if (meta.config.requireTwitch && !twitch) return err('connexion Twitch requise', 403)

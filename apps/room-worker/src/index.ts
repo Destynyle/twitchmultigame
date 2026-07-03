@@ -1,5 +1,6 @@
 import type { Env } from './types'
 export { BattleRoom } from './room'
+export { WeeklyHub } from './weekly'
 
 // Public HTTP surface. All room state lives in the BattleRoom Durable Object;
 // this router only creates rooms (password-gated) and forwards the rest.
@@ -59,6 +60,31 @@ export default {
     const path = url.pathname.replace(/\/+$/, '')
 
     if (path === '/rooms' && request.method === 'POST') return createRoom(request, env)
+
+    // Weekly blindtest — a single hub DO. Publishing is password-gated.
+    const weekly = /^\/weekly(?:\/(results|leaderboard))?$/.exec(path)
+    if (weekly) {
+      const hub = env.WEEKLY.get(env.WEEKLY.idFromName('hub'))
+      const sub = weekly[1]
+      if (!sub && request.method === 'POST') {
+        const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
+        if (!body) return json({ error: 'requête invalide' }, 400)
+        if (!env.ROOM_PASSWORD || body.password !== env.ROOM_PASSWORD) {
+          return json({ error: 'mot de passe invalide' }, 403)
+        }
+        return withCors(await hub.fetch('https://do/set', { method: 'POST', body: JSON.stringify(body) }))
+      }
+      if (!sub && request.method === 'GET') return withCors(await hub.fetch('https://do/get'))
+      if (sub === 'results' && request.method === 'POST') {
+        return withCors(
+          await hub.fetch('https://do/results', { method: 'POST', body: request.body }),
+        )
+      }
+      if (sub === 'leaderboard' && request.method === 'GET') {
+        return withCors(await hub.fetch('https://do/leaderboard'))
+      }
+      return json({ error: 'not found' }, 404)
+    }
 
     // /rooms/:code[/op] → forward to the room's DO as /op (default /view).
     const m = /^\/rooms\/([A-Za-z0-9]{4,8})(?:\/(view|search|submit|admin|ws))?$/.exec(path)

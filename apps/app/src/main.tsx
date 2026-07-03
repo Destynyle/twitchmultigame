@@ -12,6 +12,8 @@ import BattleAdmin from './pages/BattleAdmin'
 import BattleOverlay from './pages/BattleOverlay'
 import BattleGate from './components/BattleGate'
 import Room from './pages/Room'
+import Weekly from './pages/Weekly'
+import WeeklyHost from './pages/WeeklyHost'
 
 const router = createBrowserRouter([
   { path: '/', element: <Setup /> },
@@ -24,6 +26,9 @@ const router = createBrowserRouter([
   { path: '/battle/overlay', element: <BattleGate><BattleOverlay /></BattleGate> },
   // Viewer side of a battle room — public: the room code is the invitation.
   { path: '/room/:code', element: <Room /> },
+  // Weekly blindtest: public leaderboard + autopilot host mode.
+  { path: '/weekly', element: <Weekly /> },
+  { path: '/weekly/host', element: <WeeklyHost /> },
   { path: '/auth/spotify', element: <AuthSpotify /> },
   { path: '/auth/twitch', element: <AuthTwitch /> },
   { path: '*', element: <Navigate to="/" replace /> },

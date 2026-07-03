@@ -62,6 +62,11 @@ export class BattleController {
   private voteTimer: ReturnType<typeof setTimeout> | null = null
   private feed: BattleVoteFeed[] = []
 
+  // Optional chat feedback (needs the streamer's chat:edit token). Null = silent.
+  private announce: ((text: string) => void) | null = null
+  // Users already told they hit the per-user cap (avoid replying to every retry).
+  private capWarned = new Set<string>()
+
   constructor(
     channel: string,
     resolve: SubmissionResolver,
@@ -70,6 +75,11 @@ export class BattleController {
     this.channel = channel
     this.resolve = resolve
     this.onChange = onChange
+  }
+
+  /** Wire (or unwire) chat feedback messages. */
+  setAnnouncer(fn: ((text: string) => void) | null): void {
+    this.announce = fn
   }
 
   // ─── Config (lobby) ───────────────────────────────────────────────────────
@@ -120,7 +130,13 @@ export class BattleController {
     if (this.phase === 'lobby') {
       const m = ADD_RE.exec(msg.text.trim())
       if (!m) return
-      if (this.countByUser(msg.displayName) >= this.config.maxPerUser) return
+      if (this.countByUser(msg.displayName) >= this.config.maxPerUser) {
+        if (!this.capWarned.has(msg.username)) {
+          this.capWarned.add(msg.username)
+          this.announce?.(`@${msg.displayName} limite atteinte (${this.config.maxPerUser} son(s) max par personne)`)
+        }
+        return
+      }
       void this.resolveAndAdd(m[1]!.trim(), msg.displayName)
       return
     }
@@ -139,10 +155,22 @@ export class BattleController {
     } catch {
       return
     }
-    if (!entry || this.phase !== 'lobby') return
+    if (this.phase !== 'lobby') return
+    if (!entry) {
+      this.announce?.(`@${submittedBy} « ${query} » introuvable sur Spotify — réessaie avec titre + artiste`)
+      return
+    }
     // Re-check the per-user cap after the async gap (anti-spam).
     if (this.countByUser(submittedBy) >= this.config.maxPerUser) return
-    this.addEntry(entry, true)
+    const err = this.addEntry(entry, true)
+    if (err) {
+      this.announce?.(`@${submittedBy} ${err}`)
+    } else {
+      const label = entry.artist ? `${entry.title} — ${entry.artist}` : entry.title
+      this.announce?.(
+        `✅ @${submittedBy} a ajouté « ${label} » (${this.entries.length}/${this.config.maxTotal})`,
+      )
+    }
   }
 
   private recordVote(username: string, displayName: string, side: 'a' | 'b'): void {
@@ -169,18 +197,23 @@ export class BattleController {
     this.bracket = buildBracket(items)
     this.phase = 'bracket'
     this.resetVoteState()
+    this.announce?.(`⚔️ Tournoi lancé — ${items.length} sons en lice !`)
     this.emit()
     return null
   }
 
   startVote(): void {
-    if (this.phase !== 'bracket' || !this.currentItems()) return
+    const pair = this.currentItems()
+    if (this.phase !== 'bracket' || !pair) return
     this.votes.clear()
     this.voteOpen = true
     this.voteStartedAt = Date.now()
     this.lastWinner = null
     this.clearTimer()
     this.voteTimer = setTimeout(() => this.endVote(), this.config.voteSec * 1000)
+    this.announce?.(
+      `🗳️ Vote (${this.config.voteSec}s) : 1 = ${pair.a.title} · 2 = ${pair.b.title}`,
+    )
     this.emit()
   }
 
@@ -215,7 +248,15 @@ export class BattleController {
     if (!cur) return
     this.bracket = applyWinner(this.bracket, cur.round, cur.match, this.lastWinner)
     this.resetVoteState()
-    if (!nextOpenMatch(this.bracket)) this.phase = 'done'
+    if (!nextOpenMatch(this.bracket)) {
+      this.phase = 'done'
+      const champ = champion(this.bracket)
+      if (champ) {
+        const e = this.entries.find((x) => x.id === champ.id)
+        const by = e ? ` (soumis par ${e.submittedBy})` : ''
+        this.announce?.(`🏆 Champion : ${champ.title}${champ.artist ? ` — ${champ.artist}` : ''}${by}`)
+      }
+    }
     this.emit()
   }
 
@@ -225,6 +266,7 @@ export class BattleController {
     this.phase = 'lobby'
     this.bracket = null
     this.feed = []
+    this.capWarned.clear()
     this.resetVoteState()
     this.emit()
   }

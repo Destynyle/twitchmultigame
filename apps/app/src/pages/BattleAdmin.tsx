@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BattleController, type SubmissionResolver } from '../battle/controller'
-import { TwitchChatReader } from '../lib/twitch-chat'
+import { TwitchChatReader, TwitchChatSender, type SenderStatus } from '../lib/twitch-chat'
+import { getChatCredentials, needsChatReconnect } from '../lib/twitch-auth'
 import { createBattlePublisher } from '../lib/battle-sync'
 import { loadChannel, saveChannel } from '../lib/storage'
 import { isSpotifyConnected, searchSpotifyTracks, type SpotifyTrackHit } from '../lib/spotify'
@@ -48,6 +49,7 @@ function BattleRoom({ channel }: { channel: string }) {
   const ctrlRef = useRef<BattleController | null>(null)
   const [snap, setSnap] = useState<BattleSnapshot | null>(null)
   const [chatStatus, setChatStatus] = useState('connecting')
+  const [senderStatus, setSenderStatus] = useState<SenderStatus | null>(null)
   const spotifyOn = isSpotifyConnected()
 
   useEffect(() => {
@@ -72,7 +74,18 @@ function BattleRoom({ channel }: { channel: string }) {
     })
     reader.connect()
 
+    // Chat feedback (✅ ajouté / vote ouvert / champion) via the streamer's
+    // token — optional, everything works silently without it.
+    const creds = getChatCredentials()
+    let sender: TwitchChatSender | null = null
+    if (creds) {
+      sender = new TwitchChatSender(channel, creds, setSenderStatus)
+      sender.connect()
+      ctrl.setAnnouncer((text) => sender?.say(text))
+    }
+
     return () => {
+      sender?.disconnect()
       reader.disconnect()
       pub.close()
       ctrl.dispose()
@@ -88,6 +101,9 @@ function BattleRoom({ channel }: { channel: string }) {
         <Link to="/" className="text-white/40 hover:text-white">← Accueil</Link>
         <span className="font-medium">⚔️ Battle · #{snap.channel}</span>
         <StatusDot status={chatStatus} />
+        {senderStatus === 'connected' && (
+          <span className="text-white/40" title="Confirmations envoyées dans le chat">📣</span>
+        )}
         <a
           href={`${import.meta.env.BASE_URL}battle/overlay`}
           target="_blank"
@@ -102,6 +118,18 @@ function BattleRoom({ channel }: { channel: string }) {
         <p className="mb-4 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
           ⚠️ Spotify non connecté — la résolution des soumissions chat (<code>!add</code>) et la
           recherche manuelle ne marcheront pas. Connecte Spotify depuis la page Config.
+        </p>
+      )}
+      {needsChatReconnect() && (
+        <p className="mb-4 rounded-lg bg-sky-500/10 px-3 py-2 text-xs text-sky-300">
+          💬 Reconnecte Twitch (page Config) pour que le bot confirme les ajouts dans le chat
+          (nouvelles permissions <code>chat:edit</code>). Optionnel — tout marche sans.
+        </p>
+      )}
+      {senderStatus === 'auth-failed' && (
+        <p className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">
+          ⚠️ Session Twitch expirée — les confirmations chat sont coupées. Reconnecte Twitch
+          depuis la page Config.
         </p>
       )}
 

@@ -6,10 +6,9 @@
 // authorization would require a backend (deliberately avoided here).
 
 const KEY = 'battle:unlocked'
-// Also sent as the room-creation password (worker checks it against its
-// ROOM_PASSWORD secret). Still shipped in the bundle, so still obscurity —
-// change the worker secret to something private to truly lock room creation.
-export const PASSWORD = 'desty'
+// UI-hiding only. Server-gated actions (weekly publish, room creation) use the
+// separately prompted admin password (lib/admin-pass.ts) — never this constant.
+const PASSWORD = 'desty'
 
 export function isBattleUnlocked(): boolean {
   return localStorage.getItem(KEY) === '1'

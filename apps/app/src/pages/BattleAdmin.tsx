@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { BattleController, type SubmissionResolver } from '../battle/controller'
 import { TwitchChatReader, TwitchChatSender, type SenderStatus } from '../lib/twitch-chat'
 import { getChatCredentials, needsChatReconnect } from '../lib/twitch-auth'
-import { PASSWORD as BATTLE_PASSWORD } from '../lib/battle-gate'
+import { clearAdminPassword, getAdminPassword } from '../lib/admin-pass'
 import { fetchMeta, parseSource } from '../lib/sources'
 import {
   createRoom,
@@ -174,8 +174,10 @@ function BattleRoom({ channel }: { channel: string }) {
 
   const openWebRoom = async (requireTwitch: boolean) => {
     const cfg = ctrlRef.current?.getConfig()
+    const password = getAdminPassword()
+    if (!password) return
     try {
-      const { code, adminKey } = await createRoom(BATTLE_PASSWORD, {
+      const { code, adminKey } = await createRoom(password, {
         theme: cfg?.theme ?? '',
         maxPerUser: cfg?.maxPerUser ?? 2,
         maxTotal: cfg?.maxTotal ?? 16,
@@ -186,7 +188,9 @@ function BattleRoom({ channel }: { channel: string }) {
       setRoomOpen(true)
       setWebRoom(room)
     } catch (e) {
-      alert(`Création de room impossible : ${(e as Error).message}`)
+      const m = (e as Error).message
+      if (m.includes('mot de passe')) clearAdminPassword()
+      alert(`Création de room impossible : ${m}`)
     }
   }
 

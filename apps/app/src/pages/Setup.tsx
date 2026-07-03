@@ -20,7 +20,8 @@ import {
 } from '../lib/settings'
 import ConnectionsPanel from '../components/ConnectionsPanel'
 import Footer from '../components/Footer'
-import { isBattleUnlocked, PASSWORD as ADMIN_PASSWORD } from '../lib/battle-gate'
+import { isBattleUnlocked } from '../lib/battle-gate'
+import { clearAdminPassword, getAdminPassword } from '../lib/admin-pass'
 import { publishWeekly } from '../lib/weekly-api'
 
 const ACTIVE_KEY = 'blindtest:activePlaylist'
@@ -144,14 +145,18 @@ export default function Setup() {
   // new weekly blindtest. The worker re-checks the password server-side.
   async function publishAsWeekly() {
     if (!active || active.tracks.length < 2) return
+    const password = getAdminPassword()
+    if (!password) return
     const theme = window.prompt('Thème affiché pour la semaine ?', active.name)
     if (theme === null) return
     if (!window.confirm(`Remplacer le blindtest de la semaine par « ${active.name} » (${active.tracks.length} pistes) ? Les scores en cours seront remis à zéro.`)) return
     try {
-      const r = await publishWeekly(ADMIN_PASSWORD, theme.trim(), active.tracks)
+      const r = await publishWeekly(password, theme.trim(), active.tracks)
       alert(`✅ Semaine publiée (${r.trackCount} pistes)`)
     } catch (e) {
-      alert(`Échec : ${(e as Error).message}`)
+      const m = (e as Error).message
+      if (m.includes('mot de passe')) clearAdminPassword()
+      alert(`Échec : ${m}`)
     }
   }
 

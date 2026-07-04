@@ -18,6 +18,10 @@ interface Meta {
 const TTL_MS = 12 * 60 * 60 * 1000
 const SEARCH_PER_MIN = 10
 const SUBMIT_PER_MIN = 5
+// Room-wide caps: clientId is client-chosen, so rotating ids bypasses the
+// per-client buckets — these bound the damage (Spotify quota, storage writes).
+const ROOM_SEARCH_PER_MIN = 60
+const ROOM_SUBMIT_PER_MIN = 30
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
@@ -138,6 +142,7 @@ export class BattleRoom extends DurableObject<Env> {
     const clientId = (url.searchParams.get('clientId') ?? '').slice(0, 64)
     if (!clientId) return err('clientId requis', 400)
     if (!this.allow(clientId, 'search', SEARCH_PER_MIN)) return err('doucement — réessaie dans une minute', 429)
+    if (!this.allow('*', 'search-room', ROOM_SEARCH_PER_MIN)) return err('la room est surchargée — réessaie dans une minute', 429)
     try {
       return json({ hits: await searchTracks(this.env, url.searchParams.get('q') ?? '') })
     } catch {
@@ -178,6 +183,7 @@ export class BattleRoom extends DurableObject<Env> {
     // per-browser id, which clearing localStorage resets).
     const ownerKey = twitch ? `tw:${twitch.userId}` : clientId
     if (!this.allow(ownerKey, 'submit', SUBMIT_PER_MIN)) return err('doucement — réessaie dans une minute', 429)
+    if (!this.allow('*', 'submit-room', ROOM_SUBMIT_PER_MIN)) return err('la room est surchargée — réessaie dans une minute', 429)
 
     const subs = await this.subs()
     if (subs.length >= meta.config.maxTotal) return err('room pleine', 409)
